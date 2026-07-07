@@ -29,6 +29,9 @@
     .sync-option-icon{font-size:1.3rem;flex-shrink:0;width:32px;text-align:center}
     .sync-option-label{font-weight:700;font-size:.9rem}
     .sync-option-sub{font-size:.76rem;color:var(--muted);margin-top:2px}
+    .focus-btn{background:rgba(10,22,45,.6);border:1px solid rgba(110,145,210,.2);color:var(--muted);padding:8px 14px;border-radius:12px;cursor:pointer;font-size:.85rem;font-weight:600;transition:border-color .15s,background .15s}
+    .focus-btn:hover{border-color:rgba(110,145,210,.4)}
+    .focus-btn.active{background:linear-gradient(180deg,var(--blue),var(--blue2));color:#fff;border-color:rgba(255,255,255,.08)}
     .page{display:none}.page.active{display:block}.card{overflow:clip}.card-head{padding:18px 18px 10px;display:flex;justify-content:space-between;align-items:center;gap:14px}.card-head h2,.card-head h3{margin:0}.card-head p{margin:4px 0 0;color:var(--muted)}.card-body{padding:18px}
     .grid{display:grid;gap:16px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
     .filters{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:12px}
@@ -225,7 +228,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.4.0 · 07/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.4.1 · 07/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
