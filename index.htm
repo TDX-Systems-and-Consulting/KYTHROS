@@ -21,6 +21,14 @@
     .actions{display:flex;gap:10px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:rgba(17,34,65,.95);color:var(--text);padding:11px 15px;border-radius:14px;cursor:pointer}.btn:active{opacity:.8}
     .btn-primary{background:linear-gradient(180deg,var(--blue),var(--blue2))}.btn-danger{background:linear-gradient(180deg,#c94343,#982d2d)}.btn-green{background:linear-gradient(180deg,#2fca97,#149869)}
     .tabs{display:flex;gap:10px;flex-wrap:wrap;padding:10px 12px;margin-bottom:16px}.tab{background:transparent;border:1px solid transparent;color:var(--muted);padding:11px 16px;border-radius:13px;cursor:pointer}.tab.active,.subtab.active{background:linear-gradient(180deg,var(--blue),var(--blue2));color:#fff;border-color:rgba(255,255,255,.08)}
+    .sync-option{display:flex;align-items:center;gap:12px;background:rgba(8,19,37,.6);border:1px solid rgba(110,145,210,.18);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
+    .sync-option:hover{border-color:rgba(110,145,210,.4)}
+    .sync-option.selected{background:rgba(77,141,255,.12);border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}
+    .sync-option.disabled{opacity:.5;cursor:not-allowed}
+    .sync-option.disabled:hover{border-color:rgba(110,145,210,.18)}
+    .sync-option-icon{font-size:1.3rem;flex-shrink:0;width:32px;text-align:center}
+    .sync-option-label{font-weight:700;font-size:.9rem}
+    .sync-option-sub{font-size:.76rem;color:var(--muted);margin-top:2px}
     .page{display:none}.page.active{display:block}.card{overflow:clip}.card-head{padding:18px 18px 10px;display:flex;justify-content:space-between;align-items:center;gap:14px}.card-head h2,.card-head h3{margin:0}.card-head p{margin:4px 0 0;color:var(--muted)}.card-body{padding:18px}
     .grid{display:grid;gap:16px}.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
     .filters{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:12px}
@@ -200,7 +208,7 @@
 <body>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.3.1 · 07/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.3.2 · 07/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <div class="focus-toggle">
@@ -257,6 +265,17 @@
         <button class="btn" style="font-size:.75rem;padding:5px 10px" onclick="openBig3Picker()">Edit</button>
       </div>
       <div class="dash-section-body" id="dashBig3" style="flex-direction:row;flex-wrap:wrap"></div>
+    </div>
+
+    <!-- Eisenhower Matrix — every task, every stream, always the full picture -->
+    <div class="dash-section" id="dashEisenSection" style="margin-bottom:16px">
+      <div class="dash-section-head">
+        <h3>🧭 Eisenhower Matrix</h3>
+        <span style="font-size:.8rem;color:var(--muted)">All tasks, every stream</span>
+      </div>
+      <div class="dash-section-body" style="max-height:none">
+        <div class="eisenhower-board" id="dashEisenhowerBoard"></div>
+      </div>
     </div>
 
     <!-- Three-column body -->
@@ -336,7 +355,7 @@
     <div class="project-view active" id="ganttView" style="margin-top:16px"><div class="card"><div class="card-head"><div><h2>Gantt View</h2><p>Primary planning view with timeline, dependencies, milestones, and overdue visibility.</p></div></div><div class="card-body"><div class="gantt-wrap"><div class="gantt-grid" id="ganttGrid"></div></div></div></div></div>
     <div class="project-view" id="kanbanView" style="margin-top:16px"><div class="card"><div class="card-head"><div><h2>Kanban View</h2><p>Traditional left-to-right workflow view with Blocked lane.</p></div></div><div class="card-body"><div class="kanban" id="kanbanBoard"></div></div></div></div>
     <div class="project-view" id="listView" style="margin-top:16px"><div class="card"><div class="card-head"><div><h2>List View</h2><p>Bulk-friendly review of task metadata.</p></div></div><div class="card-body table-wrap"><table><thead><tr><th>Task</th><th>Stream</th><th>Project</th><th>Status</th><th>Priority</th><th>Start</th><th>Due</th><th>Assigned</th><th>Progress</th><th>Actions</th></tr></thead><tbody id="taskTableBody"></tbody></table></div></div></div>
-    <div class="project-view" id="eisenhowerView" style="margin-top:16px"><div class="card"><div class="card-head"><div><h2>Eisenhower Matrix</h2><p>Tap Urgent/Important to reclassify — quadrants sort automatically. Suggestions are pre-filled from priority and due date.</p></div></div><div class="card-body"><div id="eisenhowerBoard"></div></div></div></div>
+    <div class="project-view" id="eisenhowerView" style="margin-top:16px"><div class="card"><div class="card-head"><div><h2>Eisenhower Matrix</h2><p>All tasks, every stream — always the full picture regardless of Focus Mode or filters. Tap Urgent/Important or use Move to reclassify.</p></div></div><div class="card-body"><div class="eisenhower-board" id="eisenhowerBoard"></div></div></div></div>
   </section>
 
   <!-- ══════════════════════════════════════════════════ CALENDAR PAGE -->
@@ -1326,7 +1345,7 @@ function toggleEisenAxis(id,axis){
   const cur=axis==='urgent'?isTaskUrgent(t):isTaskImportant(t);
   t[axis]=!cur;
   saveState();
-  renderEisenhower(filteredTasks());
+  renderEisenhower();
 }
 function moveTaskToQuadrant(id,quad){
   const t=state.tasks.find(x=>x.id===id);if(!t)return;
@@ -1335,10 +1354,14 @@ function moveTaskToQuadrant(id,quad){
   else if(quad==='q3'){t.urgent=true;t.important=false;}
   else if(quad==='q4'){t.urgent=false;t.important=false;}
   saveState();
-  renderEisenhower(filteredTasks());
+  renderEisenhower();
 }
-function renderEisenhower(tasks){
-  const grid=document.getElementById('eisenhowerBoard');if(!grid)return;
+function renderEisenhower(){
+  const targets=document.querySelectorAll('.eisenhower-board');
+  if(!targets.length)return;
+  // Always the full task list — deliberately ignores Focus Mode (Work/Home/Family) and the
+  // Projects-page filter bar, since this board's whole point is deciding across ALL of life at once.
+  const tasks=state.tasks;
   const quads={q1:[],q2:[],q3:[],q4:[]};
   tasks.filter(t=>t.status!=='Done').forEach(t=>{
     const u=isTaskUrgent(t),i=isTaskImportant(t);
@@ -1363,12 +1386,13 @@ function renderEisenhower(tasks){
       </div>
     </div>`;
   }
-  grid.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+  const boardHtml=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
     <div class="card" style="background:rgba(239,83,80,.06);border:1px solid rgba(239,83,80,.25)"><div class="card-body"><h3 style="margin:0 0 4px;color:#ef5350">🔥 Do First</h3><p class="muted" style="font-size:.78rem;margin:0 0 10px">Urgent &amp; Important</p>${quads.q1.map(card).join('')||'<div class="muted" style="font-size:.8rem">Nothing here.</div>'}</div></div>
     <div class="card" style="background:rgba(29,187,135,.06);border:1px solid rgba(29,187,135,.25)"><div class="card-body"><h3 style="margin:0 0 4px;color:#1dbb87">🎯 Schedule</h3><p class="muted" style="font-size:.78rem;margin:0 0 10px">Important, Not Urgent</p>${quads.q2.map(card).join('')||'<div class="muted" style="font-size:.8rem">Nothing here.</div>'}</div></div>
     <div class="card" style="background:rgba(243,179,61,.06);border:1px solid rgba(243,179,61,.25)"><div class="card-body"><h3 style="margin:0 0 4px;color:#f3b33d">👥 Delegate</h3><p class="muted" style="font-size:.78rem;margin:0 0 10px">Urgent, Not Important</p>${quads.q3.map(card).join('')||'<div class="muted" style="font-size:.8rem">Nothing here.</div>'}</div></div>
     <div class="card" style="background:rgba(152,167,196,.06);border:1px solid rgba(152,167,196,.2)"><div class="card-body"><h3 style="margin:0 0 4px;color:#98a7c4">🗑 Eliminate</h3><p class="muted" style="font-size:.78rem;margin:0 0 10px">Neither</p>${quads.q4.map(card).join('')||'<div class="muted" style="font-size:.8rem">Nothing here.</div>'}</div></div>
   </div>`;
+  targets.forEach(el=>el.innerHTML=boardHtml);
 }
 
 function renderList(tasks){
@@ -3603,7 +3627,7 @@ function renderDashMealsToday(){
 }
 // ════════════════════════════════════════════════════
 
-function renderAll(){renderDashboard();renderFilters();const tasks=filteredTasks();renderStats(tasks);renderGantt(tasks);renderKanban(tasks);renderList(tasks);renderEisenhower(tasks);renderCalendar();renderBudget();renderNotesList();loadSelectedNoteIntoEditor();renderRecipes();renderGcalStatus();renderTimeline();renderFamilyPage();renderGoals();renderWeeklyReview();}
+function renderAll(){renderDashboard();renderFilters();const tasks=filteredTasks();renderStats(tasks);renderGantt(tasks);renderKanban(tasks);renderList(tasks);renderEisenhower();renderCalendar();renderBudget();renderNotesList();loadSelectedNoteIntoEditor();renderRecipes();renderGcalStatus();renderTimeline();renderFamilyPage();renderGoals();renderWeeklyReview();}
 
 // ════════════════════════════════════════════════════
 // ── TIMELINE SYSTEM ──
