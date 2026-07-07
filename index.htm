@@ -206,11 +206,29 @@
   </style>
 </head>
 <body>
+<div id="loginGate" class="modal-overlay" style="display:none;z-index:10000;align-items:center">
+  <div id="loginPickerView" style="width:100%;max-width:460px;margin:auto;text-align:center">
+    <div style="font-size:2rem;margin-bottom:4px">🔐</div>
+    <h1 style="font-size:1.5rem;margin-bottom:4px">KYTHROS</h1>
+    <p class="muted" style="margin-bottom:24px">Who's this?</p>
+    <div id="loginTiles" style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:24px"></div>
+    <button class="btn btn-primary" style="width:100%" onclick="openAddPersonForm()">+ Add Person</button>
+  </div>
+  <div id="pinEntryView" style="display:none;width:100%;max-width:340px;margin:auto;text-align:center">
+    <div style="font-size:2.4rem;margin-bottom:8px" id="pinEntryEmoji"></div>
+    <div style="font-weight:700;font-size:1.1rem;margin-bottom:18px" id="pinEntryName"></div>
+    <div id="pinDots" style="display:flex;gap:12px;justify-content:center;margin-bottom:24px"></div>
+    <div id="pinKeypad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:260px;margin:0 auto"></div>
+    <div id="pinError" style="color:var(--red);font-size:.85rem;margin-top:14px;min-height:1.2em"></div>
+    <button class="btn" style="margin-top:18px" onclick="cancelPinEntry()">← Back</button>
+  </div>
+</div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.3.2 · 07/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.4.0 · 07/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
+      <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
       <div class="focus-toggle">
         <button class="focus-btn active" id="focusFull" onclick="setFocusMode('full',this)">⚡ Full</button>
         <button class="focus-btn" id="focusWork" onclick="setFocusMode('work',this)">💼 Work</button>
@@ -2985,10 +3003,159 @@ function applyImportedRecipe(recipe){
 // ════════════════════════════════════════════════════
 // ── MULTI-USER / USER PROFILE ──
 // ════════════════════════════════════════════════════
+// loadUserProfile/saveUserProfile now transparently operate on whichever
+// person is checked in this session (see LOGIN GATE below). Every existing
+// call site keeps working unchanged.
 function loadUserProfile(){
-  try{return JSON.parse(localStorage.getItem('kythros_user_profile')||'null');}catch{return null;}
+  const id=activeProfileId();if(!id)return null;
+  try{return JSON.parse(localStorage.getItem('kythros_user_profile_'+id)||'null');}catch{return null;}
 }
-function saveUserProfile(p){localStorage.setItem('kythros_user_profile',JSON.stringify(p));}
+function saveUserProfile(p){
+  const id=activeProfileId();if(!id)return;
+  localStorage.setItem('kythros_user_profile_'+id,JSON.stringify(p));
+  const roster=loadProfileRoster();
+  const idx=roster.findIndex(r=>r.id===id);
+  if(idx>-1){roster[idx].name=p.name||roster[idx].name;roster[idx].emoji=p.emoji||roster[idx].emoji;saveProfileRoster(roster);}
+}
+
+// ════════════════════════════════════════════════════
+// ── LOGIN GATE (multi-person, PIN-based) ──
+// ════════════════════════════════════════════════════
+function uidPerson(){return 'p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function loadProfileRoster(){try{return JSON.parse(localStorage.getItem('kythros_profiles')||'[]');}catch{return [];}}
+function saveProfileRoster(r){localStorage.setItem('kythros_profiles',JSON.stringify(r));}
+function activeProfileId(){return sessionStorage.getItem('kythros_active_id')||null;}
+function setActiveProfileId(id){sessionStorage.setItem('kythros_active_id',id);}
+function clearActiveProfileId(){sessionStorage.removeItem('kythros_active_id');}
+
+function migrateOldProfileIfNeeded(){
+  if(localStorage.getItem('kythros_profiles'))return;
+  const old=localStorage.getItem('kythros_user_profile');
+  const roster=[];
+  if(old){
+    try{
+      const p=JSON.parse(old);
+      const id=uidPerson();
+      roster.push({id,name:p.name||'Me',emoji:p.emoji||'👤',pin:null});
+      localStorage.setItem('kythros_user_profile_'+id,old);
+    }catch(e){}
+  }
+  saveProfileRoster(roster);
+}
+
+let _pinTarget=null,_pinBuffer='',_pinMode='enter',_pinFirstEntry='';
+
+function checkLoginGate(){
+  migrateOldProfileIfNeeded();
+  const roster=loadProfileRoster();
+  const activeId=activeProfileId();
+  if(activeId&&roster.find(r=>r.id===activeId)){
+    finishBoot();
+    return;
+  }
+  renderLoginTiles();
+  document.getElementById('loginPickerView').style.display='block';
+  document.getElementById('pinEntryView').style.display='none';
+  document.getElementById('loginGate').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function finishBoot(){
+  const gate=document.getElementById('loginGate');
+  if(gate)gate.style.display='none';
+  document.body.style.overflow='';
+  renderAll();renderUserBadge();initFocusMode();
+}
+function renderLoginTiles(){
+  const roster=loadProfileRoster();
+  const el=document.getElementById('loginTiles');if(!el)return;
+  if(!roster.length){el.innerHTML='<div class="muted" style="width:100%">No profiles yet — add the first person below.</div>';return;}
+  el.innerHTML=roster.map(r=>`<div onclick="startPinEntry('${r.id}','${r.pin===null?'set':'enter'}')" style="cursor:pointer;background:rgba(10,22,45,.6);border:1px solid rgba(110,145,210,.2);border-radius:16px;padding:16px 20px;text-align:center;min-width:100px">
+    <div style="font-size:2rem">${esc(r.emoji||'👤')}</div>
+    <div style="font-weight:700;margin-top:6px;font-size:.9rem">${esc(r.name)}</div>
+  </div>`).join('');
+}
+function openAddPersonForm(){
+  const name=prompt('Name?');
+  if(!name||!name.trim())return;
+  const emoji=(prompt('Pick an emoji (optional)','👤')||'👤').trim().slice(0,2)||'👤';
+  const roster=loadProfileRoster();
+  const id=uidPerson();
+  roster.push({id,name:name.trim(),emoji,pin:null});
+  saveProfileRoster(roster);
+  localStorage.setItem('kythros_user_profile_'+id,JSON.stringify({name:name.trim(),emoji,sharedCalendarId:'',familyCalendars:[],syncPref:'google'}));
+  startPinEntry(id,'set');
+}
+function startPinEntry(id,mode){
+  _pinTarget=id;_pinMode=mode;_pinBuffer='';_pinFirstEntry='';
+  const roster=loadProfileRoster();
+  const r=roster.find(x=>x.id===id);if(!r)return;
+  document.getElementById('pinEntryEmoji').textContent=r.emoji||'👤';
+  document.getElementById('pinEntryName').textContent=mode==='set'?`Set a PIN for ${r.name}`:r.name;
+  document.getElementById('pinError').textContent='';
+  document.getElementById('loginPickerView').style.display='none';
+  document.getElementById('pinEntryView').style.display='block';
+  renderPinDots();renderPinKeypad();
+}
+function cancelPinEntry(){
+  _pinTarget=null;_pinBuffer='';
+  document.getElementById('pinEntryView').style.display='none';
+  document.getElementById('loginPickerView').style.display='block';
+  renderLoginTiles();
+}
+function renderPinDots(){
+  const el=document.getElementById('pinDots');if(!el)return;
+  el.innerHTML=[0,1,2,3].map(i=>`<div style="width:16px;height:16px;border-radius:50%;border:2px solid var(--blue);background:${i<_pinBuffer.length?'var(--blue)':'transparent'}"></div>`).join('');
+}
+function renderPinKeypad(){
+  const el=document.getElementById('pinKeypad');if(!el)return;
+  const keys=['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  el.innerHTML=keys.map(k=>k===''?'<div></div>':`<button class="btn" style="font-size:1.3rem;padding:16px 0" onclick="pinKeyPress('${k}')">${k}</button>`).join('');
+}
+function pinKeyPress(k){
+  if(k==='⌫'){_pinBuffer=_pinBuffer.slice(0,-1);renderPinDots();return;}
+  if(_pinBuffer.length>=4)return;
+  _pinBuffer+=k;
+  renderPinDots();
+  if(_pinBuffer.length===4)setTimeout(processPinEntry,150);
+}
+function processPinEntry(){
+  const roster=loadProfileRoster();
+  const idx=roster.findIndex(x=>x.id===_pinTarget);
+  if(idx<0)return;
+  const r=roster[idx];
+  if(_pinMode==='set'){
+    if(!_pinFirstEntry){
+      _pinFirstEntry=_pinBuffer;_pinBuffer='';
+      document.getElementById('pinEntryName').textContent='Confirm PIN';
+      renderPinDots();
+      return;
+    }
+    if(_pinBuffer!==_pinFirstEntry){
+      document.getElementById('pinError').textContent="PINs didn't match — try again.";
+      _pinFirstEntry='';_pinBuffer='';
+      document.getElementById('pinEntryName').textContent=`Set a PIN for ${r.name}`;
+      renderPinDots();
+      return;
+    }
+    roster[idx].pin=_pinBuffer;
+    saveProfileRoster(roster);
+    setActiveProfileId(_pinTarget);
+    finishBoot();
+    return;
+  }
+  if(_pinBuffer===r.pin){
+    setActiveProfileId(_pinTarget);
+    finishBoot();
+  } else {
+    document.getElementById('pinError').textContent='Wrong PIN — try again.';
+    _pinBuffer='';
+    renderPinDots();
+  }
+}
+function switchUser(){
+  clearActiveProfileId();
+  checkLoginGate();
+}
 
 let googleCalendarList=[];
 
@@ -4982,7 +5149,7 @@ window.addEventListener('resize',function(){try{resizeCanvas();redrawCurrentNote
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&hasGoogleToken()){try{markGoogleConnected();fetchGoogleEvents().catch(function(){});}catch(e){}}});
 
 try{document.getElementById('txnDate').value=todayISO();}catch(e){}
-try{renderAll();renderUserBadge();initFocusMode();}catch(e){console.warn('renderAll:',e);}
+try{checkLoginGate();}catch(e){console.warn('checkLoginGate:',e);renderAll();renderUserBadge();initFocusMode();}
 
 loadGoogleScripts();
 </script>
