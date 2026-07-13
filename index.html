@@ -228,7 +228,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.2 · 13/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.3 · 13/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
@@ -347,7 +347,7 @@
       <div class="card-body">
         <div class="import-info">
           <strong>CSV columns (13):</strong> <code>date</code>, <code>stream</code>, <code>type</code>, <code>timeline_id</code>, <code>title</code>, <code>owner</code>, <code>priority</code>, <code>window_start</code>, <code>window_due</code>, <code>phase</code>, <code>calendar_item</code>, <code>dependencies</code>, <code>description</code><br/>
-          <strong>Streams:</strong> <code>DLG</code> · <code>383</code> · <code>STONEHAVEN</code> · <code>MINISTRY</code> · <code>315</code> &nbsp;|&nbsp;
+          <strong>Streams:</strong> <code>383</code> · <code>STONEHAVEN</code> · <code>MINISTRY</code> · <code>315</code> &nbsp;|&nbsp;
           <strong>Types:</strong> <code>BEGIN</code> · <code>DUE</code> · <code>MILESTONE</code> · <code>LOCK_DECISION</code> · <code>PHASE_BEGINS</code> · <code>PHASE_MILESTONE</code> · <code>SERMON</code> · <code>BLOG</code> · <code>ROLE_BEGIN</code><br/>
           Duplicates (same <code>timeline_id</code> + <code>stream</code>) are skipped automatically. DUE rows referencing an existing BEGIN are skipped. Download the template to see example rows.
         </div>
@@ -492,7 +492,6 @@
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <label style="font-weight:700;font-size:.9rem;color:var(--muted)">Project:</label>
       <select id="projectBudgetStream" onchange="renderProjectBudget()" style="font-size:.95rem;padding:9px 14px;border-radius:10px;background:rgba(8,19,37,.9);border:1px solid rgba(110,145,210,.25);color:#eaf0fb;font-weight:600">
-        <option value="DLG">DLG — Durbin Leadership Group</option>
         <option value="383">383 — Men's Conference</option>
         <option value="STONEHAVEN">STONEHAVEN — Church Plant</option>
         <option value="MINISTRY">MINISTRY — Content</option>
@@ -847,8 +846,8 @@ const weekStart=(date=new Date())=>{const d=new Date(date);const day=d.getDay();
 const dayNames=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
 // ── Stream helpers ──
-const STREAM_PROJECT_MAP={'DLG':'DLG','383':'383 Men\'s Conference','STONEHAVEN':'Stonehaven','MINISTRY':'Ministry / Content','315':'The 3:15 Project','KYTHROS':'KYTHROS Launch'};
-const STREAM_PILL_CLASS={'DLG':'stream-dlg','383':'stream-383','STONEHAVEN':'stream-stonehaven','MINISTRY':'stream-ministry','315':'stream-315','KYTHROS':'stream-kythros'};
+const STREAM_PROJECT_MAP={'383':'383 Men\'s Conference','STONEHAVEN':'Stonehaven','MINISTRY':'Ministry / Content','315':'The 3:15 Project','KYTHROS':'KYTHROS Launch'};
+const STREAM_PILL_CLASS={'383':'stream-383','STONEHAVEN':'stream-stonehaven','MINISTRY':'stream-ministry','315':'stream-315','KYTHROS':'stream-kythros'};
 function streamPillClass(s){return STREAM_PILL_CLASS[(s||'').toUpperCase()]||''}
 const _PROJECT_PALETTE=['#4d8dff','#1dbb87','#f3b33d','#a855f7','#e63946','#fb923c','#06b6d4','#ec4899','#84cc16','#f97316','#8b5cf6','#14b8a6','#f43f5e','#0ea5e9','#eab308'];
 function projectColor(name){if(!name)return'#98a7c4';let h=0;for(let i=0;i<name.length;i++)h=((h<<5)-h+name.charCodeAt(i))|0;return _PROJECT_PALETTE[Math.abs(h)%_PROJECT_PALETTE.length];}
@@ -909,23 +908,6 @@ const sampleData={
     {id:'res-3',name:'Guest Room',emoji:'🛏',notes:''}
   ],
   projectBudgets:{
-    'DLG':{
-      allocation:0,
-      categories:[
-        {name:'Client Services & Delivery',planned:0,type:'expense'},
-        {name:'Marketing & Advertising',planned:0,type:'expense'},
-        {name:'Travel & Lodging',planned:0,type:'expense'},
-        {name:'Technology & Software',planned:0,type:'expense'},
-        {name:'Office & Supplies',planned:0,type:'expense'},
-        {name:'Meals & Entertainment',planned:0,type:'expense'},
-        {name:'Professional Development',planned:0,type:'expense'},
-        {name:'Legal & Accounting',planned:0,type:'expense'},
-        {name:'Website & Design',planned:0,type:'expense'},
-        {name:'Revenue',planned:0,type:'income'},
-        {name:'Miscellaneous',planned:0,type:'expense'}
-      ],
-      transactions:[]
-    },
     '383':{
       allocation:0,
       categories:[
@@ -1543,7 +1525,7 @@ function allCalendarEvents(){
 function calendarEventChipClass(ev){
   if(ev.source==='gcal') return 'gcal';
   if(ev.source==='task'&&ev.stream){
-    const m={'DLG':'tl-dlg','383':'tl-383','STONEHAVEN':'tl-stonehaven','MINISTRY':'tl-ministry','315':'tl-315','KYTHROS':'tl-kythros'};
+    const m={'383':'tl-383','STONEHAVEN':'tl-stonehaven','MINISTRY':'tl-ministry','315':'tl-315','KYTHROS':'tl-kythros'};
     return m[ev.stream]||'task';
   }
   if(ev.source==='task') return 'task';
@@ -1882,8 +1864,8 @@ window.switchProjectBudgetTab=switchProjectBudgetTab;
 function renderProjectBudget(){
   const stream=getActiveStream();
   const pb=getProjectBudget(stream);
-  const streamNames={'DLG':'Durbin Leadership Group','383':'383 Men\'s Conference','STONEHAVEN':'Stonehaven Church Plant','MINISTRY':'Ministry & Content','315':'The 3:15 Project','KYTHROS':'KYTHROS Launch'};
-  const streamColors={'DLG':'#4d8dff','383':'#d4a017','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946','KYTHROS':'#fb923c'};
+  const streamNames={'383':'383 Men\'s Conference','STONEHAVEN':'Stonehaven Church Plant','MINISTRY':'Ministry & Content','315':'The 3:15 Project','KYTHROS':'KYTHROS Launch'};
+  const streamColors={'383':'#d4a017','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946','KYTHROS':'#fb923c'};
   const col=streamColors[stream]||'#4d8dff';
   const titleEl=document.getElementById('projPLTitle');
   if(titleEl)titleEl.textContent=`${stream} — ${streamNames[stream]||stream}`;
@@ -2041,7 +2023,7 @@ function deleteProjectTxn(stream,id){
 function openProjectAllocationModal(){
   const stream=getActiveStream();
   const pb=getProjectBudget(stream);
-  const streamNames={'DLG':'Durbin Leadership Group','383':'383 Men\'s Conference','STONEHAVEN':'Stonehaven Church Plant','MINISTRY':'Ministry & Content','315':'The 3:15 Project','KYTHROS':'KYTHROS Launch'};
+  const streamNames={'383':'383 Men\'s Conference','STONEHAVEN':'Stonehaven Church Plant','MINISTRY':'Ministry & Content','315':'The 3:15 Project','KYTHROS':'KYTHROS Launch'};
   const el=document.getElementById('projAllocTitle');
   if(el)el.textContent=`Set Allocation — ${streamNames[stream]||stream}`;
   document.getElementById('projAllocAmount').value=pb.allocation||'';
@@ -3939,7 +3921,7 @@ function renderDashTasksToday(){
   if(countEl)countEl.textContent=`${due.length} due${overdue.length?' · '+overdue.length+' overdue':''}`;
   if(!due.length&&!overdue.length){el.innerHTML='<div class="dash-empty">No tasks due today. Well done.</div>';return;}
   const renderTask=(t,isOverdue)=>{
-    const col=t.stream?({'DLG':'#4d8dff','383':'#f3b33d','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946'}[t.stream]||'#4d8dff'):'#4d8dff';
+    const col=t.stream?({'383':'#f3b33d','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946'}[t.stream]||'#4d8dff'):'#4d8dff';
     const badge=isOverdue?`<span class="dash-overdue-badge">OVERDUE ${fmtDate(t.due)}</span>`:`<span class="dash-today-badge">${t.priority}</span>`;
     const privBadge=t.privacy==='focus'?`<span style="font-size:.7rem;background:rgba(168,85,247,.15);color:#d4b0ff;border-radius:6px;padding:1px 6px">🎯 Focus</span>`:t.privacy==='public'?`<span style="font-size:.7rem;background:rgba(29,187,135,.12);color:#6ee7b7;border-radius:6px;padding:1px 6px">👁 Family</span>`:'';
     return`<div class="dash-task" style="border-left-color:${col}" onclick="openTask('${t.id}')"><div class="dash-task-title">${esc(t.title)}</div><div class="dash-task-meta">${badge}${privBadge}<span>${esc(t.project||'')}</span>${t.stream?`<span style="color:${col}">${t.stream}</span>`:''}</div></div>`;
@@ -3969,7 +3951,7 @@ function renderDashEventsToday(){
   let html='';
   if(events.length){
     html+=events.map(e=>{
-      const col=e.stream?({'DLG':'#4d8dff','383':'#f3b33d','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946'}[e.stream]||'rgba(77,141,255,.5)'):'rgba(77,141,255,.5)';
+      const col=e.stream?({'383':'#f3b33d','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946'}[e.stream]||'rgba(77,141,255,.5)'):'rgba(77,141,255,.5)';
       return`<div class="dash-event" style="border-left-color:${col}"><div class="dash-event-title">${esc(e.title)}</div><div class="dash-event-time">${e.startTime?e.startTime+(e.endTime?' - '+e.endTime:''):fmtDate(e.date)}${e.location?` · <span onclick="openLocationInMaps('${esc(e.location).replace(/'/g,"\\'")}');" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">📍 ${esc(e.location)}</span>`:''}</div></div>`;
     }).join('');
   }
@@ -4032,8 +4014,7 @@ function renderStreamOverview(){
   const today=todayISO();
   const d=new Date(); const eom=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
   const streams=[
-    {key:'DLG',label:'Durbin Leadership Group',cls:'stream-card-dlg'},
-    {key:'383',label:'383 Men\'s Conference',cls:'stream-card-383'},
+        {key:'383',label:'383 Men\'s Conference',cls:'stream-card-383'},
     {key:'STONEHAVEN',label:'Stonehaven Church Plant',cls:'stream-card-stonehaven'},
     {key:'MINISTRY',label:'Ministry / Content',cls:'stream-card-ministry'},
     {key:'315',label:'The 3:15 Project',cls:'stream-card-315'},
@@ -4060,7 +4041,7 @@ function renderPhaseRoadmap(){
   const phaseTypes=new Set(['PHASE_BEGINS','PHASE_MILESTONE']);
   const phases=state.tasks.filter(t=>phaseTypes.has((t.taskType||'').toUpperCase()));
   if(!phases.length){el.innerHTML='<div class="muted">Import the master timeline CSV to populate the phase roadmap.</div>';return;}
-  const streams=['DLG','383','STONEHAVEN','MINISTRY','315','KYTHROS'];
+  const streams=['383','STONEHAVEN','MINISTRY','315','KYTHROS'];
   const html=streams.map(stream=>{
     const sp=phases.filter(p=>p.stream===stream).sort((a,b)=>(a.start||a.due||'').localeCompare(b.start||b.due||''));
     if(!sp.length)return'';
@@ -4085,8 +4066,6 @@ function downloadTimelineTemplate(){
     ['2026-04-21','383','BEGIN','FN-02','Set up accounting tracking system for 383','Finance Lead','HIGH','2026-04-21','2026-05-15','Foundation','false','F-01','Every income and expense transaction must be tracked from day one.'],
     ['2026-04-22','STONEHAVEN','PHASE_BEGINS','','PHASE 1: THE FOUNDATION April 2026 – June 2026','Travis','HIGH','2026-04-22','2026-06-30','Phase 1','true','','Build the structural, spiritual, and relational foundation.'],
     ['2026-04-26','MINISTRY','SERMON','','The Only Thing That Actually Defeated Fear','Travis','MEDIUM','2026-04-26','2026-04-26','UNSHAKEABLE Series','true','','Easter Sunday. Series: UNSHAKEABLE. Series base scripture: Philippians 4:6-7.'],
-    ['2026-05-10','DLG','LOCK_DECISION','D1','LOCK 2027 DLG revenue target — specific dollar figure written','Travis','CRITICAL','2026-05-10','2026-05-10','Phase 1','true','','Write down a specific 2027 gross revenue number. Test against four scenarios.'],
-    ['2026-05-10','DLG','LOCK_DECISION','D2','LOCK 2028 DLG revenue target — specific dollar figure written','Travis','CRITICAL','2026-05-10','2026-05-10','Phase 1','true','D1','2028 is the year Stonehaven launches. This determines whether DLG runs at full capacity or pauses.'],
     ['2026-05-05','383','MILESTONE','M-01','Conference officially launched — all foundational documents signed','Conference Director','CRITICAL','2026-05-05','2026-05-05','Foundation','true','F-01,F-02','Formal launch gate. Until M-01 is hit, 383 is an idea. After M-01, it is an operating entity.'],
     ['2026-07-01','383','MILESTONE','M-02','Venue contract signed','Operations Lead','CRITICAL','2026-07-01','2026-07-01','Phase 2','true','V-05','Hardest gate in Phase 2. Once signed the conference becomes real to everyone.'],
     ['2026-06-01','STONEHAVEN','PHASE_BEGINS','','PHASE 2: THE CORE TEAM July 2026 – September 2026','Travis','HIGH','2026-07-01','2026-09-30','Phase 2','true','','Identify and commit your founding team.'],
@@ -4122,7 +4101,7 @@ function parseTimelineCSV(text){
   const firstCols=parseLine(lines[0]);
   const firstCell=(firstCols[0]||'').toLowerCase();
   const startIdx=(firstCell==='date'||firstCell==='stream'||firstCell==='')?1:0;
-  const validStreams=new Set(['DLG','383','STONEHAVEN','MINISTRY','315','KYTHROS']);
+  const validStreams=new Set(['383','STONEHAVEN','MINISTRY','315','KYTHROS']);
   return lines.slice(startIdx).map(line=>{
     const cols=parseLine(line);
     const[date='',stream='',type='',timeline_id='',title='',owner='',priority='',window_start='',window_due='',phase='',calendar_item_raw='',dependencies_raw='',description='']=cols;
@@ -4143,7 +4122,7 @@ function parseTimelineCSV(text){
 function previewParsedRows(rows){
   pendingImportRows=rows;
   const panel=document.getElementById('importPreviewPanel');
-  if(!rows.length){panel.innerHTML='<div class="muted" style="padding:10px">No valid rows found. Ensure columns match the template and stream values are DLG, 383, STONEHAVEN, MINISTRY, 315, or KYTHROS.</div>';panel.style.display='block';return;}
+  if(!rows.length){panel.innerHTML='<div class="muted" style="padding:10px">No valid rows found. Ensure columns match the template and stream values are 383, STONEHAVEN, MINISTRY, 315, or KYTHROS.</div>';panel.style.display='block';return;}
   const streamCounts={};rows.forEach(r=>{streamCounts[r.stream]=(streamCounts[r.stream]||0)+1;});
   const calCount=rows.filter(r=>r.calendar_item).length;
   const milTypes=new Set(['MILESTONE','PHASE_MILESTONE','ROLE_BEGIN','PHASE_BEGINS']);
@@ -5213,7 +5192,7 @@ function renderCalDay(){
 }
 
 function getEventColor(e){
-  if(e.stream){const m={'DLG':'#4d8dff','383':'#d4a017','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946','KYTHROS':'#fb923c'};return m[e.stream]||'#4d8dff';}
+  if(e.stream){const m={'383':'#d4a017','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946','KYTHROS':'#fb923c'};return m[e.stream]||'#4d8dff';}
   if(e.source==='gcal')return'#1dbb87';
   if(e.source==='task')return'#d4a017';
   return'#4d8dff';
