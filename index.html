@@ -228,7 +228,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.3 · 13/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.4 · 13/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
@@ -5344,8 +5344,16 @@ try{
   noteCanvas.addEventListener('pointerup',endDraw,{passive:false});
   noteCanvas.addEventListener('pointercancel',endDraw,{passive:false});
   var nc=noteCanvas;
-  nc.addEventListener('touchstart',function(e){e.preventDefault();var t=e.touches[0];if(t){var r=nc.getBoundingClientRect();beginStroke({x:t.clientX-r.left,y:t.clientY-r.top});}},{passive:false});
-  nc.addEventListener('touchmove',function(e){e.preventDefault();var t=e.touches[0];if(t){var r=nc.getBoundingClientRect();appendPoint({x:t.clientX-r.left,y:t.clientY-r.top});}},{passive:false});
+  function pickStylusTouch(e){
+    // Safari reports touchType 'stylus' vs 'direct' — prefer an explicit stylus contact.
+    for(var i=0;i<e.touches.length;i++){ if(e.touches[i].touchType==='stylus') return e.touches[i]; }
+    // Browsers that don't report touchType at all: only trust a single, unambiguous touch.
+    // Two+ simultaneous touches with no stylus flag usually means a palm is resting on screen — ignore.
+    if(e.touches.length===1 && e.touches[0].touchType===undefined) return e.touches[0];
+    return null;
+  }
+  nc.addEventListener('touchstart',function(e){e.preventDefault();var t=pickStylusTouch(e);if(t){var r=nc.getBoundingClientRect();beginStroke({x:t.clientX-r.left,y:t.clientY-r.top});}},{passive:false});
+  nc.addEventListener('touchmove',function(e){e.preventDefault();var t=pickStylusTouch(e);if(t){var r=nc.getBoundingClientRect();appendPoint({x:t.clientX-r.left,y:t.clientY-r.top});}},{passive:false});
   nc.addEventListener('touchend',function(e){e.preventDefault();finishStroke();},{passive:false});
 }catch(e){}
 document.addEventListener('click',function(e){if(e.target&&e.target.classList&&e.target.classList.contains('modal-overlay'))kClose(e.target.id);});
