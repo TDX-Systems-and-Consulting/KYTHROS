@@ -228,7 +228,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.0 · 13/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.1 · 13/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
@@ -238,7 +238,7 @@
         <button class="focus-btn" id="focusHome" onclick="setFocusMode('home',this)">🏠 Home</button>
         <button class="focus-btn" id="focusFamily" onclick="setFocusMode('family',this)">👨‍👩‍👧 Family</button>
       </div>
-      <a href="https://tdx-jobspan.com/kytrac.html" class="btn" style="text-decoration:none;background:linear-gradient(180deg,var(--amber),#b45309);color:#fff;font-weight:700">⚡ JobSpan</a><button class="btn" id="exportBtn" onclick="exportJson()">Export JSON</button>
+      <button class="btn" id="exportBtn" onclick="exportJson()">Export JSON</button>
       <button class="btn btn-primary" id="newTaskBtn" onclick="openTask()">+ Add Task</button>
     </div>
   </div>
@@ -3708,7 +3708,7 @@ function renderIssues(){
   </div>`).join('')+(resolvedCount?`<div class="muted" style="font-size:.76rem;margin-top:4px">${resolvedCount} resolved issue${resolvedCount===1?'':'s'} hidden from this view.</div>`:'');
 }
 function openIssueForm(){
-  const description=prompt('Issue (e.g. "7 Pillars site run ran long, delaying afternoon coding block")','');
+  const description=prompt('Issue (e.g. "Grocery run took longer than planned, delaying evening routine")','');
   if(description===null||!description.trim())return;
   const priorityRaw=prompt('Priority: 1 (High), 2 (Medium), 3 (Low)','2');
   const priority=[1,2,3].includes(Number(priorityRaw))?Number(priorityRaw):2;
