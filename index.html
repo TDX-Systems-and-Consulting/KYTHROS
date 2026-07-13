@@ -228,7 +228,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.4 · 13/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.5 · 13/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
@@ -799,6 +799,14 @@
 </div></div></div></div>
 
 <div id="recipeModal" class="modal-overlay"><div class="modal-box"><div class="modal-head"><h3 style="margin:0">Recipe</h3><button class="btn" id="closeRecipeModal" onclick="kClose('recipeModal')">Close</button></div><div class="modal-body"><div class="form-grid"><input id="recipeId" type="hidden" class="full" /><input id="recipeTitle" class="full" placeholder="Recipe title" /><input id="recipeServings" type="number" min="1" placeholder="Servings" /><input id="recipeTags" placeholder="Tags, comma separated" /><textarea id="recipeIngredients" class="full" placeholder="Ingredients — one per line, format: qty|unit|ingredient|category&#10;Example: 2|lb|ground beef|Meat"></textarea><textarea id="recipeInstructions" class="full" placeholder="Instructions"></textarea></div></div><div class="modal-foot"><button class="btn btn-danger" id="deleteRecipeBtn" onclick="deleteRecipe()">Delete</button><button class="btn btn-primary" id="saveRecipeBtn" onclick="saveRecipe()">Save Recipe</button></div></div></div>
+
+<div id="rockModal" class="modal-overlay"><div class="modal-box"><div class="modal-head"><div><h3 style="margin:0">Rock</h3><p class="muted" style="margin:6px 0 0">A 90-day target — any area of life.</p></div><button class="btn" onclick="kClose('rockModal')">Close</button></div><div class="modal-body"><div class="form-grid"><input class="full" id="rockId" type="hidden" /><div class="full"><input id="rockTitle" placeholder='Rock title (e.g. "Run a 5k under 30 minutes")' /></div><input id="rockDueDate" type="date" /><select id="rockStatus"><option value="on_track">On Track</option><option value="off_track">Off Track</option><option value="completed">Completed</option></select></div></div><div class="modal-foot"><button class="btn btn-danger" id="deleteRockBtn" style="display:none" onclick="deleteRockFromModal()">Delete</button><button class="btn btn-primary" onclick="saveRockFromModal()">Save Rock</button></div></div></div>
+
+<div id="scorecardModal" class="modal-overlay"><div class="modal-box"><div class="modal-head"><div><h3 style="margin:0">Log This Week</h3><p class="muted" style="margin:6px 0 0">Any three numbers that matter to you.</p></div><button class="btn" onclick="kClose('scorecardModal')">Close</button></div><div class="modal-body"><div class="form-grid"><div class="full"><label class="small muted">Week ending</label><input id="scorecardWeekEnding" type="date" /></div><div><label class="small muted">Metric 1 name</label><input id="scorecardM1Label" placeholder="e.g. workouts" /></div><div><label class="small muted">Metric 1 value</label><input id="scorecardM1Value" type="number" step="any" placeholder="0" /></div><div><label class="small muted">Metric 2 name</label><input id="scorecardM2Label" placeholder="e.g. savings ($)" /></div><div><label class="small muted">Metric 2 value</label><input id="scorecardM2Value" type="number" step="any" placeholder="0" /></div><div><label class="small muted">Metric 3 name</label><input id="scorecardM3Label" placeholder="e.g. pages read" /></div><div><label class="small muted">Metric 3 value</label><input id="scorecardM3Value" type="number" step="any" placeholder="0" /></div></div></div><div class="modal-foot"><button class="btn btn-primary" onclick="saveScorecardFromModal()">Save Week</button></div></div></div>
+
+<div id="issueModal" class="modal-overlay"><div class="modal-box"><div class="modal-head"><div><h3 style="margin:0">New Issue</h3><p class="muted" style="margin:6px 0 0">Identify it now, discuss and solve it later.</p></div><button class="btn" onclick="kClose('issueModal')">Close</button></div><div class="modal-body"><div class="form-grid"><div class="full"><textarea id="issueDescription" placeholder='Issue (e.g. "Grocery run took longer than planned, delaying evening routine")'></textarea></div><select id="issuePriority" class="full"><option value="1">High priority</option><option value="2" selected>Medium priority</option><option value="3">Low priority</option></select></div></div><div class="modal-foot"><button class="btn btn-primary" onclick="saveIssueFromModal()">Add Issue</button></div></div></div>
+
+<div id="resolveIssueModal" class="modal-overlay"><div class="modal-box"><div class="modal-head"><div><h3 style="margin:0">Resolve Issue</h3><p class="muted" style="margin:6px 0 0">How did this get solved?</p></div><button class="btn" onclick="kClose('resolveIssueModal')">Close</button></div><div class="modal-body"><div class="form-grid"><input class="full" id="resolveIssueId" type="hidden" /><div class="full"><textarea id="resolveIssueNote" placeholder="Resolution note (optional)"></textarea></div></div></div><div class="modal-foot"><button class="btn btn-primary" onclick="confirmResolveIssueFromModal()">✓ Mark Resolved</button></div></div></div>
 
 <div id="big3PickerModal" class="modal-overlay"><div class="modal-box" style="max-height:80vh;display:flex;flex-direction:column"><div class="modal-head" style="flex-shrink:0"><div><h3 style="margin:0">Set Today's Big 3</h3><p class="muted" style="margin:6px 0 0">Pick up to 3 tasks to focus on today.</p></div><button class="btn" onclick="kClose('big3PickerModal')">Close</button></div><div class="modal-body" style="overflow-y:auto;flex:1" id="big3PickerList"></div><div class="modal-foot"><button class="btn btn-primary" onclick="saveBig3()">Save</button></div></div></div>
 
@@ -3622,16 +3630,30 @@ function renderRocks(){
 }
 function openRockForm(id){
   const r=id?(state.rocks||[]).find(x=>x.id===id):null;
-  const title=prompt('Rock title (e.g. "Run a 5k under 30 minutes")',r?r.title:'');
-  if(title===null||!title.trim())return;
-  const dueDate=prompt('Due date (YYYY-MM-DD)',r?r.dueDate:'');
-  if(dueDate===null)return;
-  const status=(prompt('Status: on_track, off_track, or completed',r?r.status:'on_track')||'on_track').trim().toLowerCase();
-  if(!['on_track','off_track','completed'].includes(status)){alert('Status must be on_track, off_track, or completed.');return;}
+  document.getElementById('rockId').value=r?r.id:'';
+  document.getElementById('rockTitle').value=r?r.title:'';
+  document.getElementById('rockDueDate').value=r?r.dueDate:'';
+  document.getElementById('rockStatus').value=r?r.status:'on_track';
+  document.getElementById('deleteRockBtn').style.display=r?'inline-block':'none';
+  kOpen('rockModal');
+}
+function saveRockFromModal(){
+  const id=document.getElementById('rockId').value;
+  const title=document.getElementById('rockTitle').value.trim();
+  if(!title){alert('Give this Rock a title.');return;}
+  const dueDate=document.getElementById('rockDueDate').value;
+  const status=document.getElementById('rockStatus').value;
   if(!state.rocks)state.rocks=[];
-  if(r){r.title=title.trim();r.dueDate=dueDate.trim();r.status=status;}
-  else state.rocks.push({id:uid('rock'),title:title.trim(),dueDate:dueDate.trim(),status,createdAt:new Date().toISOString()});
-  saveState();renderRocks();
+  const existing=id?state.rocks.find(r=>r.id===id):null;
+  if(existing){existing.title=title;existing.dueDate=dueDate;existing.status=status;}
+  else state.rocks.push({id:uid('rock'),title,dueDate,status,createdAt:new Date().toISOString()});
+  saveState();renderRocks();kClose('rockModal');
+}
+function deleteRockFromModal(){
+  const id=document.getElementById('rockId').value;
+  if(!id||!confirm('Delete this Rock?'))return;
+  state.rocks=(state.rocks||[]).filter(r=>r.id!==id);
+  saveState();renderRocks();kClose('rockModal');
 }
 function deleteRock(id){
   if(!confirm('Delete this Rock?'))return;
@@ -3661,18 +3683,28 @@ function renderScorecard(){
 }
 function openScorecardForm(){
   const labels=loadMetricLabels();
-  const weekEnding=prompt('Week ending (YYYY-MM-DD)',todayISO());
-  if(weekEnding===null||!weekEnding.trim())return;
-  const m1Label=(prompt('Metric 1 name (e.g. workouts, sales calls, pages read)',labels.m1)||labels.m1).trim();
-  const m1Value=Number(prompt(m1Label+' — value this week','0')||0);
-  const m2Label=(prompt('Metric 2 name',labels.m2)||labels.m2).trim();
-  const m2Value=Number(prompt(m2Label+' — value this week','0')||0);
-  const m3Label=(prompt('Metric 3 name',labels.m3)||labels.m3).trim();
-  const m3Value=Number(prompt(m3Label+' — value this week','0')||0);
+  document.getElementById('scorecardWeekEnding').value=todayISO();
+  document.getElementById('scorecardM1Label').value=labels.m1;
+  document.getElementById('scorecardM1Value').value='';
+  document.getElementById('scorecardM2Label').value=labels.m2;
+  document.getElementById('scorecardM2Value').value='';
+  document.getElementById('scorecardM3Label').value=labels.m3;
+  document.getElementById('scorecardM3Value').value='';
+  kOpen('scorecardModal');
+}
+function saveScorecardFromModal(){
+  const weekEnding=document.getElementById('scorecardWeekEnding').value;
+  if(!weekEnding){alert('Pick a week-ending date.');return;}
+  const m1Label=document.getElementById('scorecardM1Label').value.trim()||'Metric 1';
+  const m1Value=Number(document.getElementById('scorecardM1Value').value||0);
+  const m2Label=document.getElementById('scorecardM2Label').value.trim()||'Metric 2';
+  const m2Value=Number(document.getElementById('scorecardM2Value').value||0);
+  const m3Label=document.getElementById('scorecardM3Label').value.trim()||'Metric 3';
+  const m3Value=Number(document.getElementById('scorecardM3Value').value||0);
   saveMetricLabels({m1:m1Label,m2:m2Label,m3:m3Label});
   if(!state.scorecard)state.scorecard=[];
-  state.scorecard.push({id:uid('score'),weekEnding:weekEnding.trim(),m1Label,m1Value,m2Label,m2Value,m3Label,m3Value,createdAt:new Date().toISOString()});
-  saveState();renderScorecard();
+  state.scorecard.push({id:uid('score'),weekEnding,m1Label,m1Value,m2Label,m2Value,m3Label,m3Value,createdAt:new Date().toISOString()});
+  saveState();renderScorecard();kClose('scorecardModal');
 }
 function deleteScorecardWeek(id){
   if(!confirm('Delete this week\'s entry?'))return;
@@ -3698,20 +3730,28 @@ function renderIssues(){
   </div>`).join('')+(resolvedCount?`<div class="muted" style="font-size:.76rem;margin-top:4px">${resolvedCount} resolved issue${resolvedCount===1?'':'s'} hidden from this view.</div>`:'');
 }
 function openIssueForm(){
-  const description=prompt('Issue (e.g. "Grocery run took longer than planned, delaying evening routine")','');
-  if(description===null||!description.trim())return;
-  const priorityRaw=prompt('Priority: 1 (High), 2 (Medium), 3 (Low)','2');
-  const priority=[1,2,3].includes(Number(priorityRaw))?Number(priorityRaw):2;
+  document.getElementById('issueDescription').value='';
+  document.getElementById('issuePriority').value='2';
+  kOpen('issueModal');
+}
+function saveIssueFromModal(){
+  const description=document.getElementById('issueDescription').value.trim();
+  if(!description){alert('Describe the issue.');return;}
+  const priority=Number(document.getElementById('issuePriority').value)||2;
   if(!state.issues)state.issues=[];
-  state.issues.push({id:uid('issue'),description:description.trim(),dateIdentified:new Date().toISOString(),priority,resolved:false,resolutionNote:''});
-  saveState();renderIssues();
+  state.issues.push({id:uid('issue'),description,dateIdentified:new Date().toISOString(),priority,resolved:false,resolutionNote:''});
+  saveState();renderIssues();kClose('issueModal');
 }
 function resolveIssue(id){
+  document.getElementById('resolveIssueId').value=id;
+  document.getElementById('resolveIssueNote').value='';
+  kOpen('resolveIssueModal');
+}
+function confirmResolveIssueFromModal(){
+  const id=document.getElementById('resolveIssueId').value;
   const issue=(state.issues||[]).find(i=>i.id===id);if(!issue)return;
-  const note=prompt('How was this resolved?','');
-  if(note===null)return;
-  issue.resolved=true;issue.resolutionNote=note.trim();
-  saveState();renderIssues();
+  issue.resolved=true;issue.resolutionNote=document.getElementById('resolveIssueNote').value.trim();
+  saveState();renderIssues();kClose('resolveIssueModal');
 }
 
 // ── Calendar Routing Engine (teaching-phase Silent Queue + Sunday lockout) ──
@@ -5235,9 +5275,9 @@ function setEraser(){currentTool='eraser';var a=document.getElementById('eraserT
 
 // ── Window exposure (Safari iOS requires explicit window.X) ──
 window.kOpen=kOpen;window.kClose=kClose;window.switchTab=switchTab;window.switchView=switchView;
-window.openRockForm=openRockForm;window.deleteRock=deleteRock;
-window.openScorecardForm=openScorecardForm;window.deleteScorecardWeek=deleteScorecardWeek;
-window.openIssueForm=openIssueForm;window.resolveIssue=resolveIssue;
+window.openRockForm=openRockForm;window.deleteRock=deleteRock;window.saveRockFromModal=saveRockFromModal;window.deleteRockFromModal=deleteRockFromModal;
+window.openScorecardForm=openScorecardForm;window.deleteScorecardWeek=deleteScorecardWeek;window.saveScorecardFromModal=saveScorecardFromModal;
+window.openIssueForm=openIssueForm;window.resolveIssue=resolveIssue;window.saveIssueFromModal=saveIssueFromModal;window.confirmResolveIssueFromModal=confirmResolveIssueFromModal;
 window.initCalendarRoutingEngine=initCalendarRoutingEngine;
 window.calPrev=calPrev;window.calNext=calNext;window.setPen=setPen;window.setEraser=setEraser;
 window.openTask=openTask;window.advanceTaskStatus=advanceTaskStatus;window.openEvent=openEvent;
