@@ -228,7 +228,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.1 · 13/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.2 · 13/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
@@ -579,11 +579,11 @@
     </div>
     <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
       <div class="card">
-        <div class="card-head"><div><h2>🪨 Rocks</h2><p>TDX's 90-day targets, EOS-style.</p></div><button class="btn btn-primary" onclick="openRockForm()">+ Add Rock</button></div>
+        <div class="card-head"><div><h2>🪨 Rocks</h2><p>Your 90-day targets — any area of life.</p></div><button class="btn btn-primary" onclick="openRockForm()">+ Add Rock</button></div>
         <div class="card-body" id="rocksList" style="display:flex;flex-direction:column;gap:10px"></div>
       </div>
       <div class="card">
-        <div class="card-head"><div><h2>📊 Scorecard</h2><p>Weekly numbers: lines of code, outbound calls, active MRR.</p></div><button class="btn btn-primary" onclick="openScorecardForm()">+ Log Week</button></div>
+        <div class="card-head"><div><h2>📊 Weekly Metrics</h2><p>Track any three numbers that matter to you this week.</p></div><button class="btn btn-primary" onclick="openScorecardForm()">+ Log Week</button></div>
         <div class="card-body" id="scorecardList" style="display:flex;flex-direction:column;gap:10px"></div>
       </div>
     </div>
@@ -3640,9 +3640,9 @@ function renderRocks(){
 }
 function openRockForm(id){
   const r=id?(state.rocks||[]).find(x=>x.id===id):null;
-  const title=prompt('Rock title (e.g. "Wire live RentCast/Anthropic APIs for KYTALYST")',r?r.title:'');
+  const title=prompt('Rock title (e.g. "Run a 5k under 30 minutes")',r?r.title:'');
   if(title===null||!title.trim())return;
-  const dueDate=prompt('Due date (YYYY-MM-DD)',r?r.dueDate:'2026-09-01');
+  const dueDate=prompt('Due date (YYYY-MM-DD)',r?r.dueDate:'');
   if(dueDate===null)return;
   const status=(prompt('Status: on_track, off_track, or completed',r?r.status:'on_track')||'on_track').trim().toLowerCase();
   if(!['on_track','off_track','completed'].includes(status)){alert('Status must be on_track, off_track, or completed.');return;}
@@ -3657,35 +3657,43 @@ function deleteRock(id){
   saveState();renderRocks();
 }
 
-// ── Scorecard (weekly metrics) ──
+// ── Weekly Metrics (freeform — any 3 numbers you want to track) ──
+function loadMetricLabels(){try{return JSON.parse(localStorage.getItem('kythros_metric_labels'))||{m1:'Metric 1',m2:'Metric 2',m3:'Metric 3'}}catch{return{m1:'Metric 1',m2:'Metric 2',m3:'Metric 3'}}}
+function saveMetricLabels(l){localStorage.setItem('kythros_metric_labels',JSON.stringify(l));}
 function renderScorecard(){
   const el=document.getElementById('scorecardList');if(!el)return;
   const rows=(state.scorecard||[]).slice().sort((a,b)=>b.weekEnding.localeCompare(a.weekEnding));
-  if(rows.length===0){el.innerHTML='<div class="muted">No weeks logged yet.</div>';return;}
+  const labels=loadMetricLabels();
+  if(rows.length===0){el.innerHTML='<div class="muted">No weeks logged yet. First entry will ask what you want to track.</div>';return;}
   el.innerHTML=rows.map(s=>`<div style="background:rgba(10,22,45,.5);border:1px solid rgba(110,145,210,.15);border-radius:12px;padding:12px 14px">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font-weight:700;font-size:.88rem">Week ending ${esc(s.weekEnding)}</div>
       <button class="btn btn-danger" style="font-size:.7rem;padding:3px 8px" onclick="deleteScorecardWeek('${s.id}')">Delete</button>
     </div>
     <div style="font-size:.8rem;margin-top:8px;display:flex;gap:16px;flex-wrap:wrap">
-      <span><strong style="color:#4d8dff">${esc(s.linesOfCode)}</strong> lines of code</span>
-      <span><strong style="color:#1dbb87">${esc(s.outboundCalls)}</strong> outbound calls</span>
-      <span><strong style="color:#ffb200">$${esc(s.activeMRR)}</strong> active MRR</span>
+      <span><strong style="color:#4d8dff">${esc(s.m1Value)}</strong> ${esc(s.m1Label||labels.m1)}</span>
+      <span><strong style="color:#1dbb87">${esc(s.m2Value)}</strong> ${esc(s.m2Label||labels.m2)}</span>
+      <span><strong style="color:#ffb200">${esc(s.m3Value)}</strong> ${esc(s.m3Label||labels.m3)}</span>
     </div>
   </div>`).join('');
 }
 function openScorecardForm(){
-  const weekEnding=prompt('Week ending (Saturday date, YYYY-MM-DD)',todayISO());
+  const labels=loadMetricLabels();
+  const weekEnding=prompt('Week ending (YYYY-MM-DD)',todayISO());
   if(weekEnding===null||!weekEnding.trim())return;
-  const linesOfCode=Number(prompt('Lines of code this week','0')||0);
-  const outboundCalls=Number(prompt('Outbound calls this week','0')||0);
-  const activeMRR=Number(prompt('Active MRR ($) — target 18750','0')||0);
+  const m1Label=(prompt('Metric 1 name (e.g. workouts, sales calls, pages read)',labels.m1)||labels.m1).trim();
+  const m1Value=Number(prompt(m1Label+' — value this week','0')||0);
+  const m2Label=(prompt('Metric 2 name',labels.m2)||labels.m2).trim();
+  const m2Value=Number(prompt(m2Label+' — value this week','0')||0);
+  const m3Label=(prompt('Metric 3 name',labels.m3)||labels.m3).trim();
+  const m3Value=Number(prompt(m3Label+' — value this week','0')||0);
+  saveMetricLabels({m1:m1Label,m2:m2Label,m3:m3Label});
   if(!state.scorecard)state.scorecard=[];
-  state.scorecard.push({id:uid('score'),weekEnding:weekEnding.trim(),linesOfCode,outboundCalls,activeMRR,createdAt:new Date().toISOString()});
+  state.scorecard.push({id:uid('score'),weekEnding:weekEnding.trim(),m1Label,m1Value,m2Label,m2Value,m3Label,m3Value,createdAt:new Date().toISOString()});
   saveState();renderScorecard();
 }
 function deleteScorecardWeek(id){
-  if(!confirm('Delete this week\'s scorecard entry?'))return;
+  if(!confirm('Delete this week\'s entry?'))return;
   state.scorecard=(state.scorecard||[]).filter(s=>s.id!==id);
   saveState();renderScorecard();
 }
