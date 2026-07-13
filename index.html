@@ -20,7 +20,7 @@
     .brand h1{margin:0;font-size:2rem;line-height:1.05}.brand p{margin:8px 0 0;color:var(--muted)}
     .actions{display:flex;gap:10px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:rgba(17,34,65,.95);color:var(--text);padding:11px 15px;border-radius:14px;cursor:pointer}.btn:active{opacity:.8}
     .btn-primary{background:linear-gradient(180deg,var(--blue),var(--blue2))}.btn-danger{background:linear-gradient(180deg,#c94343,#982d2d)}.btn-green{background:linear-gradient(180deg,#2fca97,#149869)}
-    .tabs{display:flex;gap:10px;flex-wrap:wrap;padding:10px 12px;margin-bottom:16px}.tab{background:transparent;border:1px solid transparent;color:var(--muted);padding:11px 16px;border-radius:13px;cursor:pointer}.tab.active,.subtab.active{background:linear-gradient(180deg,var(--blue),var(--blue2));color:#fff;border-color:rgba(255,255,255,.08)}
+    .tabs{display:flex;gap:10px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:10px 12px;margin-bottom:16px}.tabs::-webkit-scrollbar{display:none}.tab{background:transparent;border:1px solid transparent;color:var(--muted);padding:11px 16px;border-radius:13px;cursor:pointer;flex-shrink:0;white-space:nowrap}.tab.active,.subtab.active{background:linear-gradient(180deg,var(--blue),var(--blue2));color:#fff;border-color:rgba(255,255,255,.08)}
     .sync-option{display:flex;align-items:center;gap:12px;background:rgba(8,19,37,.6);border:1px solid rgba(110,145,210,.18);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
     .sync-option:hover{border-color:rgba(110,145,210,.4)}
     .sync-option.selected{background:rgba(77,141,255,.12);border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}
@@ -228,7 +228,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.5 · 13/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.6 · 13/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
@@ -5094,7 +5094,7 @@ function kClose(id){var el=document.getElementById(id);if(el){el.style.display='
 function switchTab(pageId,btn){
   document.querySelectorAll('#mainTabs .tab').forEach(function(b){b.classList.remove('active');});
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
-  if(btn)btn.classList.add('active');
+  if(btn){btn.classList.add('active');try{btn.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});}catch(e){}}
   var pg=document.getElementById(pageId);if(pg)pg.classList.add('active');
   if(pageId==='notesPage'){try{resizeCanvas();redrawCurrentNote();}catch(e){}}
   if(pageId==='familyPage'){try{renderFamilyPage();}catch(e){}}
