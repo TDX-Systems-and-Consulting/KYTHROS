@@ -228,7 +228,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.4.2 · 12/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.0 · 13/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
@@ -577,6 +577,20 @@
         <div class="card-body" id="weeklyReviewList" style="display:flex;flex-direction:column;gap:10px"></div>
       </div>
     </div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+      <div class="card">
+        <div class="card-head"><div><h2>🪨 Rocks</h2><p>TDX's 90-day targets, EOS-style.</p></div><button class="btn btn-primary" onclick="openRockForm()">+ Add Rock</button></div>
+        <div class="card-body" id="rocksList" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h2>📊 Scorecard</h2><p>Weekly numbers: lines of code, outbound calls, active MRR.</p></div><button class="btn btn-primary" onclick="openScorecardForm()">+ Log Week</button></div>
+        <div class="card-body" id="scorecardList" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="card-head"><div><h2>🧩 Issues List (IDS)</h2><p>Identify, Discuss, Solve — open issues sorted by priority.</p></div><button class="btn btn-primary" onclick="openIssueForm()">+ Add Issue</button></div>
+      <div class="card-body" id="issuesList" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
   </section>
 
   <section class="page" id="kythyPage">
@@ -798,6 +812,26 @@ const GCAL_DISCOVERY_DOCS=[
   'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
   'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
 ];
+// ── Teaching Phase Config (Silent Queue windows) ──
+// dow: 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat. Times in 24hr "HH:MM".
+const TEACHING_PHASES={
+  Phase1_Summer:{
+    label:'Phase 1 — Summer',
+    activeUntil:'2026-08-21', // last day this phase's windows apply
+    windows:[
+      {dow:2,start:'15:00',end:'17:30'}, // Tue 3:00-5:30pm
+      {dow:3,start:'15:00',end:'17:30'}  // Wed 3:00-5:30pm
+    ]
+  },
+  Phase2_Fall:{
+    label:'Phase 2 — Fall',
+    activeFrom:'2026-08-22',
+    windows:[
+      {dow:2,start:'09:00',end:'14:00'}, // Tue 9:00am-2:00pm
+      {dow:4,start:'09:00',end:'14:00'}  // Thu 9:00am-2:00pm
+    ]
+  }
+};
 const GCAL_SCOPE='https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file';
 const GDRIVE_FILE_NAME='kythros-state.json';
 let gdriveFileId=localStorage.getItem('kythros_drive_file_id')||null;
@@ -1146,6 +1180,10 @@ function loadState(){
     if(!s.budgetCategories)s.budgetCategories=clone(sampleData.budgetCategories);
     if(!s.goals)s.goals=[];
     if(!s.weeklyReviews)s.weeklyReviews=[];
+    if(!s.rocks)s.rocks=[];
+    if(!s.scorecard)s.scorecard=[];
+    if(!s.issues)s.issues=[];
+    if(!s.teachingPhase)s.teachingPhase=clone(TEACHING_PHASES.Phase1_Summer);
     return s;
   }catch{return clone(sampleData);}
 }
@@ -3068,7 +3106,7 @@ function finishBoot(){
   const gate=document.getElementById('loginGate');
   if(gate)gate.style.display='none';
   document.body.style.overflow='';
-  renderAll();renderUserBadge();initFocusMode();
+  renderAll();renderUserBadge();initFocusMode();initCalendarRoutingEngine();
 }
 function renderLoginTiles(){
   const roster=loadProfileRoster();
@@ -3467,7 +3505,8 @@ function clearSampleData(){
     tasks:[],events:[],notes:[],budget:[],recipes:[],
     mealPlans:{},grocery:[],
     familyMembers:clone(sampleData.familyMembers),
-    familyEvents:[],projects:[],archivedProjects:[],goals:[],weeklyReviews:[]
+    familyEvents:[],projects:[],archivedProjects:[],goals:[],weeklyReviews:[],
+    rocks:[],scorecard:[],issues:[],teachingPhase:clone(TEACHING_PHASES.Phase1_Summer)
   };
   selectedNoteId=null;
   selectedRecipeId=null;
@@ -3579,6 +3618,175 @@ function deleteGoal(id){
   if(!confirm('Delete this goal?'))return;
   state.goals=(state.goals||[]).filter(g=>g.id!==id);
   saveState();renderGoals();
+}
+
+// ── Rocks (90-day targets) ──
+function renderRocks(){
+  const el=document.getElementById('rocksList');if(!el)return;
+  const rocks=(state.rocks||[]).slice().sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||''));
+  if(rocks.length===0){el.innerHTML='<div class="muted">No Rocks yet. Add your 90-day targets.</div>';return;}
+  const statusColor={on_track:'#1dbb87',off_track:'#ef5350',completed:'#4d8dff'};
+  const statusLabel={on_track:'On Track',off_track:'Off Track',completed:'Completed'};
+  el.innerHTML=rocks.map(r=>`<div style="background:rgba(10,22,45,.5);border:1px solid rgba(110,145,210,.15);border-radius:12px;padding:12px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div style="font-weight:700;font-size:.92rem">${esc(r.title)}</div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn" style="font-size:.7rem;padding:3px 8px" onclick="openRockForm('${r.id}')">Edit</button>
+        <button class="btn btn-danger" style="font-size:.7rem;padding:3px 8px" onclick="deleteRock('${r.id}')">Delete</button>
+      </div>
+    </div>
+    <div style="font-size:.76rem;color:var(--muted);margin-top:4px">Due ${esc(r.dueDate||'—')} · <span style="color:${statusColor[r.status]||'var(--muted)'};font-weight:700">${statusLabel[r.status]||r.status}</span></div>
+  </div>`).join('');
+}
+function openRockForm(id){
+  const r=id?(state.rocks||[]).find(x=>x.id===id):null;
+  const title=prompt('Rock title (e.g. "Wire live RentCast/Anthropic APIs for KYTALYST")',r?r.title:'');
+  if(title===null||!title.trim())return;
+  const dueDate=prompt('Due date (YYYY-MM-DD)',r?r.dueDate:'2026-09-01');
+  if(dueDate===null)return;
+  const status=(prompt('Status: on_track, off_track, or completed',r?r.status:'on_track')||'on_track').trim().toLowerCase();
+  if(!['on_track','off_track','completed'].includes(status)){alert('Status must be on_track, off_track, or completed.');return;}
+  if(!state.rocks)state.rocks=[];
+  if(r){r.title=title.trim();r.dueDate=dueDate.trim();r.status=status;}
+  else state.rocks.push({id:uid('rock'),title:title.trim(),dueDate:dueDate.trim(),status,createdAt:new Date().toISOString()});
+  saveState();renderRocks();
+}
+function deleteRock(id){
+  if(!confirm('Delete this Rock?'))return;
+  state.rocks=(state.rocks||[]).filter(r=>r.id!==id);
+  saveState();renderRocks();
+}
+
+// ── Scorecard (weekly metrics) ──
+function renderScorecard(){
+  const el=document.getElementById('scorecardList');if(!el)return;
+  const rows=(state.scorecard||[]).slice().sort((a,b)=>b.weekEnding.localeCompare(a.weekEnding));
+  if(rows.length===0){el.innerHTML='<div class="muted">No weeks logged yet.</div>';return;}
+  el.innerHTML=rows.map(s=>`<div style="background:rgba(10,22,45,.5);border:1px solid rgba(110,145,210,.15);border-radius:12px;padding:12px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:700;font-size:.88rem">Week ending ${esc(s.weekEnding)}</div>
+      <button class="btn btn-danger" style="font-size:.7rem;padding:3px 8px" onclick="deleteScorecardWeek('${s.id}')">Delete</button>
+    </div>
+    <div style="font-size:.8rem;margin-top:8px;display:flex;gap:16px;flex-wrap:wrap">
+      <span><strong style="color:#4d8dff">${esc(s.linesOfCode)}</strong> lines of code</span>
+      <span><strong style="color:#1dbb87">${esc(s.outboundCalls)}</strong> outbound calls</span>
+      <span><strong style="color:#ffb200">$${esc(s.activeMRR)}</strong> active MRR</span>
+    </div>
+  </div>`).join('');
+}
+function openScorecardForm(){
+  const weekEnding=prompt('Week ending (Saturday date, YYYY-MM-DD)',todayISO());
+  if(weekEnding===null||!weekEnding.trim())return;
+  const linesOfCode=Number(prompt('Lines of code this week','0')||0);
+  const outboundCalls=Number(prompt('Outbound calls this week','0')||0);
+  const activeMRR=Number(prompt('Active MRR ($) — target 18750','0')||0);
+  if(!state.scorecard)state.scorecard=[];
+  state.scorecard.push({id:uid('score'),weekEnding:weekEnding.trim(),linesOfCode,outboundCalls,activeMRR,createdAt:new Date().toISOString()});
+  saveState();renderScorecard();
+}
+function deleteScorecardWeek(id){
+  if(!confirm('Delete this week\'s scorecard entry?'))return;
+  state.scorecard=(state.scorecard||[]).filter(s=>s.id!==id);
+  saveState();renderScorecard();
+}
+
+// ── Issues List (IDS: Identify, Discuss, Solve) ──
+function renderIssues(){
+  const el=document.getElementById('issuesList');if(!el)return;
+  const open=(state.issues||[]).filter(i=>!i.resolved).slice().sort((a,b)=>a.priority-b.priority);
+  const resolvedCount=(state.issues||[]).filter(i=>i.resolved).length;
+  if(open.length===0){el.innerHTML=`<div class="muted">No open issues.${resolvedCount?' ('+resolvedCount+' resolved)':''}</div>`;return;}
+  const prLabel={1:'High',2:'Medium',3:'Low'};
+  const prColor={1:'#ef5350',2:'#ffb200',3:'#4d8dff'};
+  el.innerHTML=open.map(i=>`<div style="background:rgba(10,22,45,.5);border:1px solid rgba(110,145,210,.15);border-radius:12px;padding:12px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div style="font-weight:700;font-size:.9rem">${esc(i.description)}</div>
+      <span class="pill" style="background:${prColor[i.priority]}22;color:${prColor[i.priority]};flex-shrink:0">${prLabel[i.priority]}</span>
+    </div>
+    <div style="font-size:.74rem;color:var(--muted);margin-top:4px">Identified ${esc((i.dateIdentified||'').slice(0,10))}</div>
+    <button class="btn btn-primary" style="font-size:.72rem;padding:4px 10px;margin-top:8px" onclick="resolveIssue('${i.id}')">✓ Resolve</button>
+  </div>`).join('')+(resolvedCount?`<div class="muted" style="font-size:.76rem;margin-top:4px">${resolvedCount} resolved issue${resolvedCount===1?'':'s'} hidden from this view.</div>`:'');
+}
+function openIssueForm(){
+  const description=prompt('Issue (e.g. "7 Pillars site run ran long, delaying afternoon coding block")','');
+  if(description===null||!description.trim())return;
+  const priorityRaw=prompt('Priority: 1 (High), 2 (Medium), 3 (Low)','2');
+  const priority=[1,2,3].includes(Number(priorityRaw))?Number(priorityRaw):2;
+  if(!state.issues)state.issues=[];
+  state.issues.push({id:uid('issue'),description:description.trim(),dateIdentified:new Date().toISOString(),priority,resolved:false,resolutionNote:''});
+  saveState();renderIssues();
+}
+function resolveIssue(id){
+  const issue=(state.issues||[]).find(i=>i.id===id);if(!issue)return;
+  const note=prompt('How was this resolved?','');
+  if(note===null)return;
+  issue.resolved=true;issue.resolutionNote=note.trim();
+  saveState();renderIssues();
+}
+
+// ── Calendar Routing Engine (teaching-phase Silent Queue + Sunday lockout) ──
+function getActiveTeachingPhase(now){
+  const iso=now.toISOString().slice(0,10);
+  const fall=TEACHING_PHASES.Phase2_Fall;
+  if(fall.activeFrom&&iso>=fall.activeFrom)return fall;
+  return TEACHING_PHASES.Phase1_Summer;
+}
+function isInTeachingWindow(now,phase){
+  const day=now.getDay();
+  const mins=now.getHours()*60+now.getMinutes();
+  return (phase.windows||[]).some(w=>{
+    if(w.dow!==day)return false;
+    const[sh,sm]=w.start.split(':').map(Number);
+    const[eh,em]=w.end.split(':').map(Number);
+    return mins>=(sh*60+sm)&&mins<(eh*60+em);
+  });
+}
+function isSundayLockedOut(now){
+  const day=now.getDay();
+  const mins=now.getHours()*60+now.getMinutes();
+  if(day===6&&mins>=23*60+59)return true; // Saturday 11:59pm+
+  if(day===0)return true; // all Sunday
+  if(day===1&&mins<6*60)return true; // Monday before 6am
+  return false;
+}
+function renderCalendarRoutingBanner(){
+  const now=new Date();
+  const phase=getActiveTeachingPhase(now);
+  state.teachingPhase=phase.label;
+  const inWindow=isInTeachingWindow(now,phase);
+  let banner=document.getElementById('teachingModeBanner');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='teachingModeBanner';
+    banner.style.cssText='position:sticky;top:0;z-index:500;text-align:center;padding:8px;font-size:.82rem;font-weight:700;display:none';
+    document.body.insertBefore(banner,document.body.firstChild);
+  }
+  if(inWindow){
+    banner.style.display='block';
+    banner.style.background='rgba(239,83,80,.15)';
+    banner.style.color='#ef5350';
+    banner.textContent='🔇 Teaching Mode Active — '+phase.label+' — focus protected, non-urgent pings held.';
+  }else{
+    banner.style.display='none';
+  }
+  checkSundayLockout(now);
+}
+function checkSundayLockout(now){
+  const locked=isSundayLockedOut(now);
+  let overlay=document.getElementById('sundayLockoutOverlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='sundayLockoutOverlay';
+    overlay.style.cssText='display:none;position:fixed;inset:0;z-index:9999;background:rgba(10,14,22,.96);align-items:center;justify-content:center;flex-direction:column;color:#fff;text-align:center;padding:30px';
+    overlay.innerHTML='<div style="font-size:2rem;margin-bottom:12px">🌙</div><div style="font-size:1.2rem;font-weight:800;margin-bottom:8px">Off the clock.</div><div style="max-width:360px;color:rgba(255,255,255,.7);margin-bottom:20px">Backend access locks Saturday 11:59pm through Monday 6:00am. Log off and rest — this reopens automatically Monday morning.</div><button class="btn" onclick="document.getElementById(\'sundayLockoutOverlay\').style.display=\'none\'" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25)">Dismiss for now</button>';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display=locked?'flex':'none';
+}
+function initCalendarRoutingEngine(){
+  renderCalendarRoutingBanner();
+  clearInterval(window._calRoutingTimer);
+  window._calRoutingTimer=setInterval(renderCalendarRoutingBanner,60000);
 }
 
 // ── Weekly Review ──
@@ -3799,7 +4007,7 @@ function renderDashMealsToday(){
 }
 // ════════════════════════════════════════════════════
 
-function renderAll(){renderDashboard();renderFilters();const tasks=filteredTasks();renderStats(tasks);renderGantt(tasks);renderKanban(tasks);renderList(tasks);renderEisenhower();renderCalendar();renderBudget();renderNotesList();loadSelectedNoteIntoEditor();renderRecipes();renderGcalStatus();renderTimeline();renderFamilyPage();renderGoals();renderWeeklyReview();}
+function renderAll(){renderDashboard();renderFilters();const tasks=filteredTasks();renderStats(tasks);renderGantt(tasks);renderKanban(tasks);renderList(tasks);renderEisenhower();renderCalendar();renderBudget();renderNotesList();loadSelectedNoteIntoEditor();renderRecipes();renderGcalStatus();renderTimeline();renderFamilyPage();renderGoals();renderWeeklyReview();renderRocks();renderScorecard();renderIssues();}
 
 // ════════════════════════════════════════════════════
 // ── TIMELINE SYSTEM ──
@@ -5040,6 +5248,10 @@ function setEraser(){currentTool='eraser';var a=document.getElementById('eraserT
 
 // ── Window exposure (Safari iOS requires explicit window.X) ──
 window.kOpen=kOpen;window.kClose=kClose;window.switchTab=switchTab;window.switchView=switchView;
+window.openRockForm=openRockForm;window.deleteRock=deleteRock;
+window.openScorecardForm=openScorecardForm;window.deleteScorecardWeek=deleteScorecardWeek;
+window.openIssueForm=openIssueForm;window.resolveIssue=resolveIssue;
+window.initCalendarRoutingEngine=initCalendarRoutingEngine;
 window.calPrev=calPrev;window.calNext=calNext;window.setPen=setPen;window.setEraser=setEraser;
 window.openTask=openTask;window.advanceTaskStatus=advanceTaskStatus;window.openEvent=openEvent;
 window.deleteTxn=deleteTxn;window.selectNote=selectNote;window.selectRecipe=selectRecipe;
