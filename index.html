@@ -206,6 +206,7 @@
     .pac-matched{color:#4d8dff!important;font-weight:700!important}
     .hdpi .pac-icon,.pac-logo::after{display:none!important}
 
+    @media (max-width:700px){.dash-hero-actions{max-width:100%!important;min-width:0!important;margin-left:0!important;align-items:stretch!important;width:100%}}
   </style>
 </head>
 <body>
@@ -228,7 +229,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.7 · 13/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.8 · 13/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
@@ -238,8 +239,8 @@
         <button class="focus-btn" id="focusHome" onclick="setFocusMode('home',this)">🏠 Home</button>
         <button class="focus-btn" id="focusFamily" onclick="setFocusMode('family',this)">👨‍👩‍👧 Family</button>
       </div>
-      <button class="btn" id="exportBtn" onclick="exportJson()">Export JSON</button>
       <button class="btn btn-primary" id="newTaskBtn" onclick="openTask()">+ Add Task</button>
+      <button class="btn" id="exportBtn" onclick="exportJson()" style="font-size:.72rem;padding:5px 10px;opacity:.55" title="Download a full backup of your workspace as a JSON file">⬇ Backup</button>
     </div>
   </div>
 
@@ -268,7 +269,7 @@
           <div class="dash-greeting" id="dashGreeting">Good morning</div>
           <div class="dash-summary" id="dashSummary"></div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex:1;min-width:200px;max-width:280px;margin-left:auto">
+        <div class="dash-hero-actions" style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex:1;min-width:200px;max-width:280px;margin-left:auto">
           <button class="btn btn-primary" onclick="openTask()" style="font-weight:700;width:100%">+ Add Task</button>
           <button class="btn" onclick="newEvent()" style="width:100%">+ Add Event</button>
           <button class="btn" style="background:linear-gradient(135deg,rgba(77,141,255,.2),rgba(168,85,247,.2));border-color:rgba(168,85,247,.3);color:#d4b0ff;font-size:.82rem;width:100%" onclick="kythyBriefing()">✨ Morning Briefing</button>
