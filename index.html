@@ -229,7 +229,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.5.9 · 13/Jul/2026</p></div>
+    <div class="brand"><h1>KYTHROS Workspace</h1><p id="buildVersionLine">Version 1.6.0 · 13/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
@@ -2891,11 +2891,18 @@ function saveCurrentNote(){let note=selectedNote();if(!note){createNote();note=s
 function deleteCurrentNote(){if(!selectedNoteId||!confirm('Delete this note?'))return;state.notes=state.notes.filter(n=>n.id!==selectedNoteId);selectedNoteId=(state.notes[0]?state.notes[0].id:null)||null;saveState();renderNotesList();loadSelectedNoteIntoEditor()}
 function getCurrentBrushSize(){return currentTool==='eraser'?Number(document.getElementById('eraserSize').value):Number(document.getElementById('penSize').value)}
 function resizeCanvas(){const ratio=window.devicePixelRatio||1;const rect=noteCanvasWrap.getBoundingClientRect();noteCanvas.width=Math.max(300,Math.floor(rect.width*ratio));noteCanvas.height=Math.max(500,Math.floor(rect.height*ratio));noteCanvas.style.width=rect.width+'px';noteCanvas.style.height=rect.height+'px';noteCtx.setTransform(ratio,0,0,ratio,0,0);noteCtx.lineCap='round';noteCtx.lineJoin='round'}
-function setupStrokeStyle(stroke){noteCtx.globalCompositeOperation=stroke.tool==='eraser'?'destination-out':'source-over';noteCtx.strokeStyle=stroke.tool==='eraser'?'rgba(0,0,0,1)':(stroke.color||'#111');noteCtx.lineWidth=Number(stroke.size||3)}
-function redrawCurrentNote(){noteCtx.clearRect(0,0,noteCanvas.width,noteCanvas.height);const note=selectedNote();((note&&note.strokes)||[]).forEach(stroke=>{if(!(stroke.points&&stroke.points.length))return;setupStrokeStyle(stroke);noteCtx.beginPath();stroke.points.forEach((p,i)=>{if(i===0)noteCtx.moveTo(p.x,p.y);else noteCtx.lineTo(p.x,p.y)});noteCtx.stroke()});noteCtx.globalCompositeOperation='source-over'}
-function canvasPos(e){const rect=noteCanvas.getBoundingClientRect();return{x:e.clientX-rect.left,y:e.clientY-rect.top}}
-function beginStroke(pt){if(!selectedNoteId)createNote();drawing=true;currentStroke={tool:currentTool,color:document.getElementById('brushColor').value,size:getCurrentBrushSize(),points:[pt]};lastPoint=pt;setupStrokeStyle(currentStroke);noteCtx.beginPath();noteCtx.moveTo(pt.x,pt.y);noteCtx.lineTo(pt.x+0.01,pt.y+0.01);noteCtx.stroke()}
-function appendPoint(pt){if(!drawing||!currentStroke)return;const prev=lastPoint||pt;currentStroke.points.push(pt);setupStrokeStyle(currentStroke);noteCtx.beginPath();noteCtx.moveTo(prev.x,prev.y);noteCtx.lineTo(pt.x,pt.y);noteCtx.stroke();lastPoint=pt}
+function setupStrokeStyle(stroke,pressure){
+  noteCtx.globalCompositeOperation=stroke.tool==='eraser'?'destination-out':'source-over';
+  noteCtx.strokeStyle=stroke.tool==='eraser'?'rgba(0,0,0,1)':(stroke.color||'#111');
+  const base=Number(stroke.size||3);
+  // Pressure-sensitive width for pen tool only; eraser stays a fixed size for predictable erasing.
+  const p=(typeof pressure==='number')?pressure:1;
+  noteCtx.lineWidth=stroke.tool==='eraser'?base:Math.max(base*0.4,base*p);
+}
+function redrawCurrentNote(){noteCtx.clearRect(0,0,noteCanvas.width,noteCanvas.height);const note=selectedNote();((note&&note.strokes)||[]).forEach(stroke=>{if(!(stroke.points&&stroke.points.length))return;const pts=stroke.points;if(pts.length===1){setupStrokeStyle(stroke,pts[0].pressure);noteCtx.beginPath();noteCtx.moveTo(pts[0].x,pts[0].y);noteCtx.lineTo(pts[0].x+0.01,pts[0].y+0.01);noteCtx.stroke();return;}for(let i=1;i<pts.length;i++){setupStrokeStyle(stroke,pts[i].pressure);noteCtx.beginPath();noteCtx.moveTo(pts[i-1].x,pts[i-1].y);noteCtx.lineTo(pts[i].x,pts[i].y);noteCtx.stroke();}});noteCtx.globalCompositeOperation='source-over'}
+function canvasPos(e){const rect=noteCanvas.getBoundingClientRect();const p=(typeof e.pressure==='number'&&e.pressure>0)?e.pressure:1;return{x:e.clientX-rect.left,y:e.clientY-rect.top,pressure:p}}
+function beginStroke(pt){if(!selectedNoteId)createNote();drawing=true;currentStroke={tool:currentTool,color:document.getElementById('brushColor').value,size:getCurrentBrushSize(),points:[pt]};lastPoint=pt;setupStrokeStyle(currentStroke,pt.pressure);noteCtx.beginPath();noteCtx.moveTo(pt.x,pt.y);noteCtx.lineTo(pt.x+0.01,pt.y+0.01);noteCtx.stroke()}
+function appendPoint(pt){if(!drawing||!currentStroke)return;const prev=lastPoint||pt;currentStroke.points.push(pt);setupStrokeStyle(currentStroke,pt.pressure);noteCtx.beginPath();noteCtx.moveTo(prev.x,prev.y);noteCtx.lineTo(pt.x,pt.y);noteCtx.stroke();lastPoint=pt}
 function finishStroke(){if(!drawing||!currentStroke)return;drawing=false;const note=selectedNote();note.strokes=note.strokes||[];note.strokes.push(currentStroke);note.updatedAt=new Date().toISOString();currentStroke=null;lastPoint=null;noteCtx.globalCompositeOperation='source-over';saveState();renderNotesList();document.getElementById('noteMeta').textContent=`Last updated ${new Date(note.updatedAt).toLocaleString()}`}
 function startDraw(e){if(e.pointerType==='touch')return;if(e.pointerType&&!['pen','mouse'].includes(e.pointerType))return;e.preventDefault();if(noteCanvas.setPointerCapture)noteCanvas.setPointerCapture(e.pointerId);beginStroke(canvasPos(e))}
 function moveDraw(e){if(!drawing)return;e.preventDefault();const points=e.getCoalescedEvents?e.getCoalescedEvents():[e];points.forEach(ev=>appendPoint(canvasPos(ev)))}
