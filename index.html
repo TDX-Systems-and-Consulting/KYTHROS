@@ -652,6 +652,7 @@
 </div>
 
 <!-- Firebase SDK -->
+<script src="https://js.stripe.com/v3/"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -830,10 +831,14 @@ function initFirebase() {
       if (user) {
         _currentUser = user;
         hideAuthScreen();
-        await loadUserDataFromFirestore();
-        renderAll(); renderUserBadge(); initFocusMode(); initCalendarRoutingEngine();
+        const isSubscribed = await showPaywallIfNeeded(user);
+        if (isSubscribed) {
+          await loadUserDataFromFirestore();
+          renderAll(); renderUserBadge(); initFocusMode(); initCalendarRoutingEngine();
+        }
       } else {
         _currentUser = null;
+        hidePaywall();
         showAuthScreen();
       }
     });
@@ -1055,6 +1060,179 @@ window.forgotPassword = forgotPassword;
 window.signOut = signOut;
 // ════════════════════════════════════════════════════
 
+
+// ════════════════════════════════════════════════════
+// ── STRIPE PAYWALL ──
+// ════════════════════════════════════════════════════
+const STRIPE_PUBLISHABLE_KEY = 'pk_test_51Txtq81ZsIK94nEl72oyoKWJsLH3NOPtYZERhjlP0EOkS7426Drl5xI5JIEVdrCPElsog12FfKh8u2ptkRX0252r000s0l9aVh';
+const STRIPE_PRICE_MONTHLY = 'price_1TxuQ31ZsIK94nEll86wIP1Z';
+const STRIPE_PRICE_LIFETIME = 'price_1TxuV51ZsIK94nElhdxrvKUE';
+const ADMIN_EMAILS = ['travis@jtxdgroup.com', 'travisdurbin73@gmail.com'];
+
+let _stripe = null;
+
+function getStripe() {
+  if (!_stripe) _stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+  return _stripe;
+}
+
+async function checkSubscriptionStatus(user) {
+  // Admin always bypasses paywall
+  if (ADMIN_EMAILS.includes(user.email)) return true;
+  try {
+    const ref = _fbDb.collection('users').doc(user.uid);
+    const doc = await ref.get();
+    if (doc.exists) {
+      const data = doc.data();
+      return data.subscribed === true || data.subscriptionStatus === 'active' || data.lifetimeAccess === true;
+    }
+  } catch(e) { console.error('Sub check error:', e); }
+  return false;
+}
+
+async function showPaywallIfNeeded(user) {
+  const isSubscribed = await checkSubscriptionStatus(user);
+  if (isSubscribed) {
+    hidePaywall();
+    return true;
+  }
+  showPaywall();
+  return false;
+}
+
+function showPaywall() {
+  let el = document.getElementById('plannerxdPaywall');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'plannerxdPaywall';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99998;background:radial-gradient(circle at top,#0a2146 0%,#071426 36%,#040b14 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px;overflow-y:auto';
+    el.innerHTML = `
+      <div style="width:100%;max-width:560px;text-align:center">
+        <div style="font-size:2.5rem;font-weight:900;letter-spacing:-.04em;color:#eaf0fb;margin-bottom:4px">PlannerXD</div>
+        <div style="color:#98a7c4;font-size:.95rem;margin-bottom:8px">Your personal life operating system</div>
+        <div style="color:#4d8dff;font-size:.82rem;margin-bottom:32px">Choose a plan to get started</div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+          <!-- Monthly -->
+          <div style="background:rgba(10,22,45,.92);border:1px solid rgba(110,145,210,.2);border-radius:22px;padding:28px 20px;text-align:center">
+            <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:#98a7c4;font-weight:700;margin-bottom:12px">Monthly</div>
+            <div style="font-size:2.8rem;font-weight:900;color:#eaf0fb;line-height:1">$9.99</div>
+            <div style="color:#98a7c4;font-size:.82rem;margin-bottom:20px">per month</div>
+            <ul style="text-align:left;list-style:none;padding:0;margin:0 0 24px;display:flex;flex-direction:column;gap:8px">
+              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Full PlannerXD workspace</li>
+              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Google Calendar sync</li>
+              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> KYTHY AI assistant</li>
+              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Cancel anytime</li>
+            </ul>
+            <button onclick="startCheckout('monthly')" style="width:100%;background:linear-gradient(180deg,#4d8dff,#2b67ff);border:none;border-radius:14px;color:#fff;padding:14px;font-size:.95rem;font-weight:700;cursor:pointer">Get Monthly</button>
+          </div>
+          
+          <!-- Lifetime -->
+          <div style="background:rgba(10,22,45,.92);border:2px solid rgba(243,179,61,.4);border-radius:22px;padding:28px 20px;text-align:center;position:relative">
+            <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#f3b33d,#e09020);border-radius:999px;padding:4px 16px;font-size:.72rem;font-weight:800;color:#000;white-space:nowrap">BEST VALUE</div>
+            <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:#f3b33d;font-weight:700;margin-bottom:12px">Lifetime</div>
+            <div style="font-size:2.8rem;font-weight:900;color:#eaf0fb;line-height:1">$99.99</div>
+            <div style="color:#98a7c4;font-size:.82rem;margin-bottom:20px">one-time payment</div>
+            <ul style="text-align:left;list-style:none;padding:0;margin:0 0 24px;display:flex;flex-direction:column;gap:8px">
+              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Everything in Monthly</li>
+              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Never pay again</li>
+              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> All future updates</li>
+              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#f3b33d">★</span> Priority support</li>
+            </ul>
+            <button onclick="startCheckout('lifetime')" style="width:100%;background:linear-gradient(135deg,#f3b33d,#e09020);border:none;border-radius:14px;color:#000;padding:14px;font-size:.95rem;font-weight:800;cursor:pointer">Get Lifetime Access</button>
+          </div>
+        </div>
+
+        <div id="paywallError" style="display:none;background:rgba(239,83,80,.15);border:1px solid rgba(239,83,80,.3);border-radius:12px;padding:10px 14px;margin-bottom:16px;color:#ffc0be;font-size:.88rem"></div>
+        
+        <div style="color:rgba(110,145,210,.4);font-size:.75rem;margin-bottom:16px">Secure payment powered by Stripe · Cancel anytime</div>
+        <button onclick="signOut()" style="background:none;border:none;color:rgba(110,145,210,.4);font-size:.78rem;cursor:pointer;text-decoration:underline">Sign out</button>
+      </div>
+    `;
+    document.body.appendChild(el);
+  }
+  el.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  
+  // Check if returning from successful Stripe checkout
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('payment') === 'success') {
+    handlePaymentSuccess();
+  }
+}
+
+function hidePaywall() {
+  const el = document.getElementById('plannerxdPaywall');
+  if (el) el.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+async function startCheckout(plan) {
+  const btn = document.querySelector(`button[onclick="startCheckout('${plan}')"]`);
+  if (btn) { btn.textContent = 'Redirecting...'; btn.disabled = true; }
+  
+  const priceId = plan === 'monthly' ? STRIPE_PRICE_MONTHLY : STRIPE_PRICE_LIFETIME;
+  const stripe = getStripe();
+  
+  // Store pending subscription info
+  if (_currentUser) {
+    localStorage.setItem('plannerxd_pending_sub', JSON.stringify({
+      uid: _currentUser.uid,
+      email: _currentUser.email,
+      plan,
+      timestamp: Date.now()
+    }));
+  }
+  
+  const successUrl = window.location.origin + window.location.pathname + '?payment=success&plan=' + plan;
+  const cancelUrl = window.location.origin + window.location.pathname + '?payment=cancelled';
+  
+  try {
+    const { error } = await stripe.redirectToCheckout({
+      lineItems: [{ price: priceId, quantity: 1 }],
+      mode: plan === 'monthly' ? 'subscription' : 'payment',
+      successUrl,
+      cancelUrl,
+      customerEmail: _currentUser ? _currentUser.email : undefined,
+    });
+    if (error) {
+      const errEl = document.getElementById('paywallError');
+      if (errEl) { errEl.textContent = error.message; errEl.style.display = 'block'; }
+      if (btn) { btn.textContent = plan === 'monthly' ? 'Get Monthly' : 'Get Lifetime Access'; btn.disabled = false; }
+    }
+  } catch(e) {
+    const errEl = document.getElementById('paywallError');
+    if (errEl) { errEl.textContent = 'Payment failed to load. Please try again.'; errEl.style.display = 'block'; }
+    if (btn) { btn.textContent = plan === 'monthly' ? 'Get Monthly' : 'Get Lifetime Access'; btn.disabled = false; }
+  }
+}
+
+async function handlePaymentSuccess() {
+  // Mark user as subscribed in Firestore
+  if (_currentUser && _fbDb) {
+    const pending = JSON.parse(localStorage.getItem('plannerxd_pending_sub') || '{}');
+    const isLifetime = pending.plan === 'lifetime' || new URLSearchParams(window.location.search).get('plan') === 'lifetime';
+    try {
+      await _fbDb.collection('users').doc(_currentUser.uid).set({
+        subscribed: true,
+        subscriptionStatus: 'active',
+        lifetimeAccess: isLifetime,
+        subscribedAt: new Date().toISOString(),
+        plan: isLifetime ? 'lifetime' : 'monthly'
+      }, { merge: true });
+      localStorage.removeItem('plannerxd_pending_sub');
+    } catch(e) { console.error('Failed to mark subscribed:', e); }
+  }
+  // Clean URL
+  window.history.replaceState({}, '', window.location.pathname);
+  hidePaywall();
+  await loadUserDataFromFirestore();
+  renderAll(); renderUserBadge(); initFocusMode(); initCalendarRoutingEngine();
+}
+
+window.startCheckout = startCheckout;
+window.hidePaywall = hidePaywall;
+// ════════════════════════════════════════════════════
 
 const STORAGE_KEY='kythros-workspace-v8';
 const GCAL_STORAGE_KEY='kythros-gcal-v6';
