@@ -3754,9 +3754,12 @@ function saveUserProfile_modal(){
     syncPref:document.getElementById('upSyncPref').value||'google'
   };
   saveUserProfile(p);
+  // Also save to simple key for Firebase auth compatibility
+  localStorage.setItem('plannerxd_cal_id', p.sharedCalendarId||'primary');
+  localStorage.setItem('plannerxd_user_name', p.name||'');
   renderUserBadge();
   kClose('userProfileModal');
-  if(p.sharedCalendarId&&(gcalState.connected||hasGoogleToken())){
+  if(gcalState.connected||hasGoogleToken()){
     fetchGoogleEvents().catch(console.error);
   }
 }
@@ -3813,16 +3816,18 @@ async function fetchGoogleEvents(){
   }
   // Also fetch shared family calendar if not already included
   const p=loadUserProfile();
-  if(p&&p.sharedCalendarId&&!calsToFetch.find(c=>c.id===p.sharedCalendarId)){
+  // Get calendar ID from profile or simple localStorage key
+  const _calId=(p&&p.sharedCalendarId)||localStorage.getItem('plannerxd_cal_id')||'primary';
+  if(_calId&&!calsToFetch.find(c=>c.id===_calId)){
     try{
       const shared=await gapi.client.calendar.events.list({
-        calendarId:p.sharedCalendarId,showDeleted:false,singleEvents:true,
+        calendarId:_calId,showDeleted:false,singleEvents:true,
         timeMin,maxResults:250,orderBy:'startTime'
       });
       for(const ev of (shared.result.items||[])){
         if(seenIds.has(ev.id))continue;
         seenIds.add(ev.id);
-        evts.push({...parseGoogleEvent(ev,p.sharedCalendarId,'Shared Calendar'),sharedCal:true});
+        evts.push({...parseGoogleEvent(ev,_calId,'Shared Calendar'),sharedCal:true});
       }
     }catch(e){console.warn('Could not fetch shared calendar:',e);}
   }
