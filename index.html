@@ -677,7 +677,7 @@
 <div class="sync-option" id="syncOptLocal" onclick="selectSyncOption('local')"><div class="sync-option-icon">💾</div><div><div class="sync-option-label">Local Only</div><div class="sync-option-sub">No cloud sync — data stays on this device</div></div></div>
 <div class="sync-option disabled" id="syncOptApple"><div class="sync-option-icon">🍎</div><div><div class="sync-option-label">Apple <span style="font-size:.72rem;background:rgba(110,145,210,.2);border-radius:999px;padding:2px 8px;margin-left:6px;color:var(--muted)">Coming soon — iOS app</span></div><div class="sync-option-sub">Apple Calendar + iCloud sync — available in the native iOS app</div></div></div>
 <input type="hidden" id="upSyncPref" value="google" /></div>
-<div class="full"><div style="font-weight:600;margin-bottom:6px">Shared Read Calendar <span style="font-weight:400;color:var(--muted);font-size:.82rem">(pull into KYTHROS)</span></div><div style="display:flex;gap:8px;margin-bottom:8px"><select id="upSharedCalPicker" style="flex:1" onchange="applySharedCalendarPicker()"><option value="">Connect Google to load calendars</option></select><button class="btn" onclick="refreshGoogleCalendarList()" style="flex-shrink:0">Refresh</button></div><input id="upSharedCal" class="full" placeholder="family@group.calendar.google.com" /><div id="upCalendarPickerStatus" style="font-size:.78rem;color:var(--muted);margin-top:6px"></div></div>
+<div class="full"><div style="font-weight:600;margin-bottom:6px">Shared Read Calendar <span style="font-weight:400;color:var(--muted);font-size:.82rem">(pull into PlannerXD)</span></div><div style="display:flex;gap:8px;margin-bottom:8px"><select id="upSharedCalPicker" style="flex:1" onchange="applySharedCalendarPicker()"><option value="">Connect Google to load calendars</option></select><button class="btn" onclick="refreshGoogleCalendarList()" style="flex-shrink:0">Refresh</button></div><input id="upSharedCal" class="full" placeholder="family@group.calendar.google.com" /><div id="upCalendarPickerStatus" style="font-size:.78rem;color:var(--muted);margin-top:6px"></div></div>
 <div class="full"><div style="font-weight:600;margin-bottom:6px">Family Calendars <span style="font-weight:400;color:var(--muted);font-size:.82rem">(push events to these)</span></div><div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Add calendars you have write access to — used when creating events.</div><div id="upFamilyCalList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div><div style="display:flex;gap:8px;margin-bottom:8px"><select id="upFamilyCalPicker" style="flex:1" onchange="applyFamilyCalendarPicker()"><option value="">Connect Google to load calendars</option></select><button class="btn" onclick="refreshGoogleCalendarList()" style="flex-shrink:0">Refresh</button></div><div style="display:flex;gap:8px"><input id="upFcName" placeholder="Name (e.g. Ashley)" style="flex:0 0 130px" /><input id="upFcId" placeholder="Calendar ID" style="flex:1" /><button class="btn btn-primary" onclick="addFamilyCalendar()" style="flex-shrink:0">Add</button></div></div>
 <div class="full" style="border-top:1px solid rgba(110,145,210,.12);padding-top:14px"><div style="font-weight:600;margin-bottom:6px">KYTHY AI Settings</div><div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Anthropic API key — get a free key at <strong>console.anthropic.com</strong></div><input id="upApiKey" class="full" type="password" placeholder="sk-ant-..." autocomplete="off" /></div>
 <div class="full" style="border-top:1px solid rgba(239,83,80,.15);padding-top:14px;background:rgba(239,83,80,.05);border-radius:12px;padding:12px 14px"><div style="font-weight:600;color:#ef5350;margin-bottom:4px;font-size:.9rem">⚠ New User Setup</div><div style="font-size:.8rem;color:var(--muted);margin-bottom:10px">First time using KYTHROS? Clear the sample data to start fresh. <strong>Cannot be undone.</strong></div><button class="btn btn-danger" style="width:100%" onclick="kClose('userProfileModal');clearSampleData()">Clear Sample Data &amp; Start Fresh</button></div>
@@ -835,6 +835,8 @@ function initFirebase() {
         if (isSubscribed) {
           await loadUserDataFromFirestore();
           renderAll(); renderUserBadge(); initFocusMode(); initCalendarRoutingEngine();
+          // Auto-load Google scripts and attempt silent token restore
+          loadGoogleScripts();
         }
       } else {
         _currentUser = null;
@@ -3741,10 +3743,12 @@ function removeFamilyCalendar(index){
 }
 
 function saveUserProfile_modal(){
+  // Default sharedCalendarId to 'primary' if empty
+  const calIdInput = document.getElementById('upSharedCal').value.trim();
   const p={
     name:document.getElementById('upName').value.trim()||'Me',
     emoji:document.getElementById('upEmoji').value.trim()||'👤',
-    sharedCalendarId:document.getElementById('upSharedCal').value.trim(),
+    sharedCalendarId:calIdInput||'primary',
     familyCalendars:(loadUserProfile()||{}).familyCalendars||[],
     anthropicKey:document.getElementById('upApiKey').value.trim(),
     syncPref:document.getElementById('upSyncPref').value||'google'
@@ -3788,6 +3792,8 @@ async function fetchGoogleEvents(){
   try{
     const listResp=await gapi.client.calendar.calendarList.list({maxResults:250,showHidden:false});
     calsToFetch=(listResp.result.items||[]).map(c=>({id:c.id,primary:!!c.primary}));
+    // Always ensure primary is included
+    if(!calsToFetch.find(c=>c.primary)) calsToFetch.unshift({id:'primary',primary:true});
   }catch(e){
     calsToFetch=[{id:'primary',primary:true}];
     console.warn('Could not fetch calendar list, falling back to primary:',e);
