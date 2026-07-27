@@ -239,6 +239,7 @@
       </div>
       <button class="btn btn-primary" id="newTaskBtn" onclick="openTask()">+ Add Task</button>
       <button class="btn" id="exportBtn" onclick="exportJson()" style="font-size:.72rem;padding:5px 10px;opacity:.55" title="Download a full backup of your workspace as a JSON file">⬇ Backup</button>
+      <button class="btn btn-danger" onclick="signOut()" style="font-size:.72rem;padding:5px 10px" title="Sign out">Sign Out</button>
     </div>
   </div>
 
@@ -650,6 +651,11 @@
   </section>
 </div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <!-- ══ DISPLAY MODE OVERLAY ══ -->
 <div class="display-overlay" id="displayOverlay" onclick="exitDisplayMode()">
   <div style="display:flex;flex-direction:column;align-items:center;padding:24px 0 8px">
@@ -799,6 +805,257 @@
 <div id="big3PickerModal" class="modal-overlay"><div class="modal-box" style="max-height:80vh;display:flex;flex-direction:column"><div class="modal-head" style="flex-shrink:0"><div><h3 style="margin:0">Set Today's Big 3</h3><p class="muted" style="margin:6px 0 0">Pick up to 3 tasks to focus on today.</p></div><button class="btn" onclick="kClose('big3PickerModal')">Close</button></div><div class="modal-body" style="overflow-y:auto;flex:1" id="big3PickerList"></div><div class="modal-foot"><button class="btn btn-primary" onclick="saveBig3()">Save</button></div></div></div>
 
 <script>
+// ════════════════════════════════════════════════════
+// ── FIREBASE CONFIG ──
+// ════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB65jSVzpQYsSvWWm7O6_hfDa6ojGMTusE",
+  authDomain: "plannerxd.firebaseapp.com",
+  projectId: "plannerxd",
+  storageBucket: "plannerxd.firebasestorage.app",
+  messagingSenderId: "835839226592",
+  appId: "1:835839226592:web:354a7576369c9890e19685"
+};
+const ADMIN_EMAIL = 'travisdurbin73@gmail.com';
+let _fbApp, _fbAuth, _fbDb, _currentUser = null, _firestoreReady = false;
+
+function initFirebase() {
+  try {
+    _fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+    _fbAuth = firebase.auth();
+    _fbDb = firebase.firestore();
+    _firestoreReady = true;
+
+    _fbAuth.onAuthStateChanged(async (user) => {
+      if (user) {
+        _currentUser = user;
+        hideAuthScreen();
+        await loadUserDataFromFirestore();
+        renderAll(); renderUserBadge(); initFocusMode(); initCalendarRoutingEngine();
+      } else {
+        _currentUser = null;
+        showAuthScreen();
+      }
+    });
+  } catch(e) {
+    console.error('Firebase init error:', e);
+  }
+}
+
+// ── Firestore data layer ──
+function userDocRef() {
+  if (!_fbDb || !_currentUser) return null;
+  return _fbDb.collection('users').doc(_currentUser.uid);
+}
+
+async function loadUserDataFromFirestore() {
+  const ref = userDocRef(); if (!ref) return;
+  try {
+    const doc = await ref.get();
+    if (doc.exists) {
+      const data = doc.data();
+      state = data.workspace || clone(sampleData);
+      applyMigrationGuards();
+    } else {
+      // New user — check if admin (Travis) to seed data
+      if (_currentUser.email === ADMIN_EMAIL) {
+        // Admin gets existing localStorage data if present
+        const local = localStorage.getItem(STORAGE_KEY);
+        if (local) {
+          try { state = JSON.parse(local); applyMigrationGuards(); }
+          catch { state = clone(sampleData); }
+        } else {
+          state = clone(sampleData);
+        }
+      } else {
+        // New paying user — clean empty workspace
+        state = getEmptyWorkspace();
+      }
+      await saveStateToFirestore();
+    }
+  } catch(e) {
+    console.error('Firestore load error:', e);
+    state = clone(sampleData);
+  }
+}
+
+function getEmptyWorkspace() {
+  return {
+    tasks: [], events: [], notes: [], budget: [], recipes: [],
+    mealPlans: {}, grocery: [], familyMembers: [], familyEvents: [],
+    projects: [], archivedProjects: [], goals: [], weeklyReviews: [],
+    rocks: [], scorecard: [], issues: [], resources: [],
+    bills: [], debts: [], budgetCategories: clone(sampleData.budgetCategories),
+    projectBudgets: clone(sampleData.projectBudgets),
+    openingBalance: 0,
+    teachingPhase: clone(TEACHING_PHASES.Phase1_Summer)
+  };
+}
+
+function applyMigrationGuards() {
+  if (!state.familyMembers) state.familyMembers = [];
+  if (!state.familyEvents) state.familyEvents = [];
+  if (!state.projects) state.projects = [];
+  if (!state.archivedProjects) state.archivedProjects = [];
+  if (!state.resources) state.resources = [];
+  if (!state.projectBudgets) state.projectBudgets = clone(sampleData.projectBudgets);
+  if (!state.bills) state.bills = [];
+  if (state.openingBalance === undefined) state.openingBalance = 0;
+  if (!state.debts) state.debts = [];
+  if (!state.budgetCategories) state.budgetCategories = clone(sampleData.budgetCategories);
+  if (!state.goals) state.goals = [];
+  if (!state.weeklyReviews) state.weeklyReviews = [];
+  if (!state.rocks) state.rocks = [];
+  if (!state.scorecard) state.scorecard = [];
+  if (!state.issues) state.issues = [];
+  if (!state.teachingPhase) state.teachingPhase = clone(TEACHING_PHASES.Phase1_Summer);
+  delete state._savedAt; delete state._version;
+}
+
+let _firestoreSaveTimer = null;
+async function saveStateToFirestore() {
+  const ref = userDocRef(); if (!ref) return;
+  try {
+    await ref.set({ workspace: state, updatedAt: new Date().toISOString() }, { merge: true });
+  } catch(e) {
+    console.error('Firestore save error:', e);
+  }
+}
+
+// ── Auth screen ──
+function showAuthScreen() {
+  let el = document.getElementById('plannerxdAuthScreen');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'plannerxdAuthScreen';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:radial-gradient(circle at top,#0a2146 0%,#071426 36%,#040b14 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px';
+    el.innerHTML = `
+      <div style="width:100%;max-width:400px;text-align:center">
+        <div style="font-size:2.5rem;font-weight:900;letter-spacing:-.04em;color:#eaf0fb;margin-bottom:4px">PlannerXD</div>
+        <div style="color:#98a7c4;font-size:.95rem;margin-bottom:36px">Your personal life operating system</div>
+        <div id="authError" style="display:none;background:rgba(239,83,80,.15);border:1px solid rgba(239,83,80,.3);border-radius:12px;padding:10px 14px;margin-bottom:16px;color:#ffc0be;font-size:.88rem"></div>
+        <div id="authFormWrap" style="background:rgba(10,22,45,.92);border:1px solid rgba(110,145,210,.2);border-radius:22px;padding:28px;text-align:left">
+          <div id="authModeTabs" style="display:flex;gap:0;border-radius:10px;overflow:hidden;border:1px solid rgba(110,145,210,.2);margin-bottom:20px">
+            <button id="authTabSignIn" onclick="setAuthMode('signin')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:700;font-size:.88rem;background:linear-gradient(135deg,#4d8dff,#3a6fd4);color:#fff">Sign In</button>
+            <button id="authTabSignUp" onclick="setAuthMode('signup')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:700;font-size:.88rem;background:rgba(8,19,37,.8);color:#98a7c4">Create Account</button>
+          </div>
+          <div id="authNameWrap" style="display:none;margin-bottom:12px">
+            <label style="font-size:.82rem;color:#98a7c4;font-weight:600;display:block;margin-bottom:4px">Your Name</label>
+            <input id="authName" placeholder="First name" style="width:100%;background:rgba(7,17,33,.94);color:#eaf0fb;border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:12px 13px;outline:none;box-sizing:border-box" />
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:.82rem;color:#98a7c4;font-weight:600;display:block;margin-bottom:4px">Email</label>
+            <input id="authEmail" type="email" placeholder="you@email.com" style="width:100%;background:rgba(7,17,33,.94);color:#eaf0fb;border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:12px 13px;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')submitAuth()" />
+          </div>
+          <div style="margin-bottom:20px">
+            <label style="font-size:.82rem;color:#98a7c4;font-weight:600;display:block;margin-bottom:4px">Password</label>
+            <input id="authPassword" type="password" placeholder="••••••••" style="width:100%;background:rgba(7,17,33,.94);color:#eaf0fb;border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:12px 13px;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')submitAuth()" />
+          </div>
+          <button onclick="submitAuth()" id="authSubmitBtn" style="width:100%;background:linear-gradient(180deg,#4d8dff,#2b67ff);border:none;border-radius:14px;color:#fff;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;margin-bottom:14px">Sign In</button>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><div style="flex:1;height:1px;background:rgba(110,145,210,.2)"></div><span style="font-size:.78rem;color:#98a7c4">or</span><div style="flex:1;height:1px;background:rgba(110,145,210,.2)"></div></div>
+          <button onclick="signInWithGoogle()" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(110,145,210,.2);border-radius:14px;color:#eaf0fb;padding:13px;font-size:.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px"><svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>Continue with Google</button>
+          <div id="authForgotWrap" style="text-align:center;margin-top:14px"><button onclick="forgotPassword()" style="background:none;border:none;color:#98a7c4;font-size:.82rem;cursor:pointer;text-decoration:underline">Forgot password?</button></div>
+        </div>
+        <div style="margin-top:20px;font-size:.78rem;color:rgba(110,145,210,.4)">PlannerXD · $9.99/mo or $49.99 lifetime</div>
+      </div>
+    `;
+    document.body.appendChild(el);
+  }
+  el.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function hideAuthScreen() {
+  const el = document.getElementById('plannerxdAuthScreen');
+  if (el) el.style.display = 'none';
+  // Also hide old login gate
+  const gate = document.getElementById('loginGate');
+  if (gate) gate.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+let _authMode = 'signin';
+function setAuthMode(mode) {
+  _authMode = mode;
+  document.getElementById('authTabSignIn').style.background = mode === 'signin' ? 'linear-gradient(135deg,#4d8dff,#3a6fd4)' : 'rgba(8,19,37,.8)';
+  document.getElementById('authTabSignIn').style.color = mode === 'signin' ? '#fff' : '#98a7c4';
+  document.getElementById('authTabSignUp').style.background = mode === 'signup' ? 'linear-gradient(135deg,#4d8dff,#3a6fd4)' : 'rgba(8,19,37,.8)';
+  document.getElementById('authTabSignUp').style.color = mode === 'signup' ? '#fff' : '#98a7c4';
+  document.getElementById('authNameWrap').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('authSubmitBtn').textContent = mode === 'signup' ? 'Create Account' : 'Sign In';
+  document.getElementById('authForgotWrap').style.display = mode === 'signin' ? 'block' : 'none';
+  document.getElementById('authError').style.display = 'none';
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+async function submitAuth() {
+  const email = (document.getElementById('authEmail').value || '').trim();
+  const password = (document.getElementById('authPassword').value || '').trim();
+  const btn = document.getElementById('authSubmitBtn');
+  if (!email || !password) { showAuthError('Email and password are required.'); return; }
+  if (btn) { btn.textContent = 'Please wait...'; btn.disabled = true; }
+  try {
+    if (_authMode === 'signup') {
+      const cred = await _fbAuth.createUserWithEmailAndPassword(email, password);
+      const name = (document.getElementById('authName').value || '').trim();
+      if (name) await cred.user.updateProfile({ displayName: name });
+    } else {
+      await _fbAuth.signInWithEmailAndPassword(email, password);
+    }
+  } catch(e) {
+    const msgs = {
+      'auth/user-not-found': 'No account found with that email.',
+      'auth/wrong-password': 'Incorrect password.',
+      'auth/email-already-in-use': 'An account with this email already exists.',
+      'auth/weak-password': 'Password must be at least 6 characters.',
+      'auth/invalid-email': 'Please enter a valid email address.',
+      'auth/invalid-credential': 'Email or password is incorrect.'
+    };
+    showAuthError(msgs[e.code] || e.message);
+    if (btn) { btn.textContent = _authMode === 'signup' ? 'Create Account' : 'Sign In'; btn.disabled = false; }
+  }
+}
+
+async function signInWithGoogle() {
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await _fbAuth.signInWithPopup(provider);
+  } catch(e) {
+    showAuthError('Google sign-in failed. Try again.');
+  }
+}
+
+async function forgotPassword() {
+  const email = (document.getElementById('authEmail').value || '').trim();
+  if (!email) { showAuthError('Enter your email address first.'); return; }
+  try {
+    await _fbAuth.sendPasswordResetEmail(email);
+    showAuthError('Password reset email sent — check your inbox.');
+    document.getElementById('authError').style.background = 'rgba(29,187,135,.15)';
+    document.getElementById('authError').style.borderColor = 'rgba(29,187,135,.3)';
+    document.getElementById('authError').style.color = '#a3f2d2';
+  } catch(e) {
+    showAuthError('Could not send reset email. Check the address.');
+  }
+}
+
+async function signOut() {
+  await _fbAuth.signOut();
+  state = getEmptyWorkspace();
+}
+
+window.setAuthMode = setAuthMode;
+window.submitAuth = submitAuth;
+window.signInWithGoogle = signInWithGoogle;
+window.forgotPassword = forgotPassword;
+window.signOut = signOut;
+// ════════════════════════════════════════════════════
+
+
 const STORAGE_KEY='kythros-workspace-v8';
 const GCAL_STORAGE_KEY='kythros-gcal-v6';
 const GCAL_CLIENT_ID='891785765781-rvoeqd44fcauol0sdihot9p2mp821g88.apps.googleusercontent.com';
@@ -1166,10 +1423,15 @@ function loadState(){
   }catch{return clone(sampleData);}
 }
 function saveState(){
-  // Include _savedAt so Drive timestamp comparison uses correct local time
+  // Save to localStorage as backup
   const toStore={...state,_savedAt:new Date().toISOString(),_version:STORAGE_KEY};
   localStorage.setItem(STORAGE_KEY,JSON.stringify(toStore));
-  // Debounce Drive save — fires 3s after the last change
+  // Save to Firestore (debounced 2s)
+  if(_currentUser&&_firestoreReady){
+    clearTimeout(_firestoreSaveTimer);
+    _firestoreSaveTimer=setTimeout(saveStateToFirestore,2000);
+  }
+  // Drive sync still works for Google-connected users
   if(gcalState.connected||hasGoogleToken()){
     clearTimeout(_driveSaveTimer);
     _driveSaveTimer=setTimeout(saveToDrive,3000);
@@ -3319,6 +3581,13 @@ function saveUserProfile_modal(){
 
 function renderUserBadge(){
   const el=document.getElementById('userBadge');if(!el)return;
+  // Show Firebase user if logged in
+  if(_currentUser){
+    const name=_currentUser.displayName||_currentUser.email.split('@')[0];
+    el.textContent='👤 '+name;
+    el.style.display='inline-flex';
+    return;
+  }
   const p=loadUserProfile();
   if(p&&p.name){
     el.textContent=(p.emoji||'👤')+' '+p.name;
@@ -5409,7 +5678,8 @@ window.addEventListener('resize',function(){try{resizeCanvas();redrawCurrentNote
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&hasGoogleToken()){try{markGoogleConnected();fetchGoogleEvents().catch(function(){});}catch(e){}}});
 
 try{document.getElementById('txnDate').value=todayISO();}catch(e){}
-try{checkLoginGate();}catch(e){console.warn('checkLoginGate:',e);renderAll();renderUserBadge();initFocusMode();}
+// Initialize Firebase Auth — this drives login/boot now
+try{ initFirebase(); }catch(e){ console.error('Firebase init failed:',e); renderAll();renderUserBadge();initFocusMode(); }
 
 loadGoogleScripts();
 </script>
