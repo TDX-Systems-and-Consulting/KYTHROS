@@ -29,7 +29,7 @@
     .sync-option-icon{font-size:1.3rem;flex-shrink:0;width:32px;text-align:center}
     .sync-option-label{font-weight:700;font-size:.9rem}
     .sync-option-sub{font-size:.76rem;color:var(--muted);margin-top:2px}
-    .focus-btn{background:rgba(10,22,45,.6);border:1px solid rgba(110,145,210,.2);color:var(--muted);padding:8px 14px;border-radius:12px;cursor:pointer;font-size:.85rem;font-weight:600;transition:border-color .15s,background .15s}
+    .focus-btn{background:rgba(10,22,45,.6);border:1px solid rgba(110,145,210,.2);color:var(--muted);padding:11px 15px;border-radius:14px;cursor:pointer;font-size:1rem;font-weight:600;transition:border-color .15s,background .15s}
     .focus-btn:hover{border-color:rgba(110,145,210,.4)}
     .focus-btn.active{background:linear-gradient(180deg,var(--blue),var(--blue2));color:#fff;border-color:rgba(255,255,255,.08)}
     .page{display:none}.page.active{display:block}.card{overflow:clip}.card-head{padding:18px 18px 10px;display:flex;justify-content:space-between;align-items:center;gap:14px}.card-head h2,.card-head h3{margin:0}.card-head p{margin:4px 0 0;color:var(--muted)}.card-body{padding:18px}
@@ -236,8 +236,8 @@
         <button class="focus-btn" id="modeWork" onclick="setPlannerMode('work',this)">Work</button>
       </div>
       <button class="btn btn-primary" id="newTaskBtn" onclick="openTask()" style="display:inline-flex">+ Add Task</button>
-      <button class="btn" id="exportBtn" onclick="exportJson()" style="font-size:.72rem;padding:5px 10px;opacity:.55" title="Download a full backup of your workspace as a JSON file">⬇ Backup</button>
-      <button class="btn btn-danger" onclick="signOut()" style="font-size:.72rem;padding:5px 10px" title="Sign out">Sign Out</button>
+      <button class="btn" id="exportBtn" onclick="exportJson()" style="opacity:.55" title="Download a full backup of your workspace as a JSON file">⬇ Backup</button>
+      <button class="btn btn-danger" onclick="signOut()" title="Sign out">Sign Out</button>
     </div>
   </div>
 
