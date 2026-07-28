@@ -622,6 +622,12 @@ select option { background: var(--bg2); }
       <button class="nav-item" data-page="planner" onclick="nav('planner')">
         <span class="nav-icon">📅</span> Daily Planner
       </button>
+      <button class="nav-item" data-page="budget" onclick="nav('budget')">
+        <span class="nav-icon">💰</span> Budget
+      </button>
+      <button class="nav-item" data-page="meals" onclick="nav('meals')">
+        <span class="nav-icon">🍽️</span> Meal Planning
+      </button>
     </div>
 
     <!-- Work Nav -->
@@ -675,6 +681,8 @@ select option { background: var(--bg2); }
     <div id="pageMatrix" class="page" style="display:none"></div>
     <div id="pagePriorities" class="page" style="display:none"></div>
     <div id="pageKanban" class="page" style="display:none"></div>
+    <div id="pageBudget" class="page" style="display:none"></div>
+    <div id="pageMeals" class="page" style="display:none"></div>
   </div>
 </div>
 
@@ -778,7 +786,37 @@ const defaultState = {
     { time: "11:00 AM", title: "Estimate review", sub: "Pending proposals" },
     { time: "1:00 PM", title: "Deep work block", sub: "PlannerXD development" },
     { time: "4:00 PM", title: "End of day wrap", sub: "Review tomorrow's priorities" },
-  ]
+  ],
+  budget: {
+    income: [
+      { id: 1, label: "JOBSMETRIX revenue", amount: 0, note: "Monthly recurring" },
+      { id: 2, label: "Consulting", amount: 0, note: "" },
+    ],
+    expenses: [
+      { id: 1, label: "Housing", amount: 0, note: "" },
+      { id: 2, label: "Vehicles", amount: 0, note: "" },
+      { id: 3, label: "Groceries", amount: 0, note: "" },
+      { id: 4, label: "Insurance", amount: 0, note: "" },
+      { id: 5, label: "Utilities", amount: 0, note: "" },
+      { id: 6, label: "Business expenses", amount: 0, note: "" },
+    ],
+    savings: [
+      { id: 1, label: "Emergency fund", amount: 0, goal: 15000 },
+      { id: 2, label: "Investment", amount: 0, goal: 0 },
+    ]
+  },
+  meals: {
+    days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+    plan: {
+      Monday: { breakfast: '', lunch: '', dinner: '' },
+      Tuesday: { breakfast: '', lunch: '', dinner: '' },
+      Wednesday: { breakfast: '', lunch: '', dinner: '' },
+      Thursday: { breakfast: '', lunch: '', dinner: '' },
+      Friday: { breakfast: '', lunch: '', dinner: '' },
+      Saturday: { breakfast: '', lunch: '', dinner: '' },
+    },
+    groceries: []
+  }
 };
 
 let state = JSON.parse(JSON.stringify(defaultState));
@@ -866,10 +904,11 @@ function nav(page) {
   });
   const titles = {
     today: 'Today', tasks: 'All Tasks', planner: 'Daily Planner',
+    budget: 'Budget', meals: 'Meal Planning',
     matrix: 'Eisenhower Matrix', priorities: 'Priorities & Pulse', kanban: 'Office Kanban'
   };
   document.getElementById('topbarTitle').textContent = titles[page] || page;
-  ['today','tasks','planner','matrix','priorities','kanban'].forEach(p => {
+  ['today','tasks','planner','budget','meals','matrix','priorities','kanban'].forEach(p => {
     document.getElementById('page' + p.charAt(0).toUpperCase() + p.slice(1)).style.display = p === page ? 'block' : 'none';
   });
   renderCurrentPage();
@@ -877,7 +916,7 @@ function nav(page) {
 }
 
 function renderCurrentPage() {
-  const renders = { today: renderToday, tasks: renderTasks, planner: renderPlanner, matrix: renderMatrix, priorities: renderPriorities, kanban: renderKanban };
+  const renders = { today: renderToday, tasks: renderTasks, planner: renderPlanner, matrix: renderMatrix, priorities: renderPriorities, kanban: renderKanban, budget: renderBudget, meals: renderMeals };
   if (renders[currentPage]) renders[currentPage]();
 }
 
@@ -1331,6 +1370,218 @@ function openSidebar() {
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+// ═══════════════════════════════════════
+// BUDGET
+// ═══════════════════════════════════════
+function renderBudget() {
+  const b = state.budget;
+  const totalIncome = b.income.reduce((s,i) => s + (Number(i.amount)||0), 0);
+  const totalExpenses = b.expenses.reduce((s,i) => s + (Number(i.amount)||0), 0);
+  const totalSavings = b.savings.reduce((s,i) => s + (Number(i.amount)||0), 0);
+  const net = totalIncome - totalExpenses - totalSavings;
+  const netColor = net >= 0 ? 'var(--green)' : 'var(--red)';
+
+  document.getElementById('pageBudget').innerHTML = `
+    <div class="page-header">
+      <div class="page-eyebrow">Personal Finance</div>
+      <div class="page-title">Budget</div>
+      <div class="page-sub">Know your numbers. Every dollar has a job.</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
+      ${[
+        {label:'Monthly Income', val:'$'+totalIncome.toLocaleString(), color:'var(--green)'},
+        {label:'Monthly Expenses', val:'$'+totalExpenses.toLocaleString(), color:'var(--red)'},
+        {label:'Savings', val:'$'+totalSavings.toLocaleString(), color:'var(--blue)'},
+        {label:'Net / Surplus', val:(net>=0?'+':'')+net.toLocaleString(), color:netColor},
+      ].map(t => `
+        <div class="card" style="text-align:center">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${t.label}</div>
+          <div style="font-size:22px;font-weight:800;color:${t.color}">${t.val}</div>
+        </div>`).join('')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">💰 Income</div>
+          <button class="btn btn-sm" onclick="addBudgetRow('income')">+ Add</button>
+        </div>
+        ${b.income.map((item,i) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="flex:1;font-size:13px">${esc(item.label)}</div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span style="font-size:12px;color:var(--muted)">$</span>
+              <input type="number" value="${item.amount}" min="0" step="100"
+                style="width:100px;text-align:right;padding:5px 8px;font-size:13px"
+                onchange="updateBudgetAmount('income',${i},this.value)">
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">📤 Expenses</div>
+          <button class="btn btn-sm" onclick="addBudgetRow('expenses')">+ Add</button>
+        </div>
+        ${b.expenses.map((item,i) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="flex:1;font-size:13px">${esc(item.label)}</div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span style="font-size:12px;color:var(--muted)">$</span>
+              <input type="number" value="${item.amount}" min="0" step="100"
+                style="width:100px;text-align:right;padding:5px 8px;font-size:13px"
+                onchange="updateBudgetAmount('expenses',${i},this.value)">
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">🏦 Savings Goals</div>
+        <button class="btn btn-sm" onclick="addBudgetRow('savings')">+ Add</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+        ${b.savings.map((item,i) => {
+          const pct = item.goal > 0 ? Math.min(100, Math.round(item.amount/item.goal*100)) : 0;
+          return `
+            <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px">
+              <div style="font-size:12px;font-weight:700;margin-bottom:8px">${esc(item.label)}</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                <span style="font-size:11px;color:var(--muted)">$</span>
+                <input type="number" value="${item.amount}" min="0" step="500"
+                  style="flex:1;text-align:right;padding:5px 8px;font-size:13px"
+                  onchange="updateBudgetAmount('savings',${i},this.value)">
+                ${item.goal > 0 ? `<span style="font-size:11px;color:var(--muted)">/ $${Number(item.goal).toLocaleString()}</span>` : ''}
+              </div>
+              ${item.goal > 0 ? `
+                <div style="height:5px;background:rgba(110,145,210,.15);border-radius:4px;overflow:hidden">
+                  <div style="height:100%;width:${pct}%;background:var(--blue);border-radius:4px"></div>
+                </div>
+                <div style="font-size:10px;color:var(--muted);margin-top:4px">${pct}% of goal</div>` : ''}
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function updateBudgetAmount(category, idx, val) {
+  state.budget[category][idx].amount = parseFloat(val) || 0;
+  scheduleSave();
+  renderBudget();
+}
+
+function addBudgetRow(category) {
+  const label = prompt(`${category.charAt(0).toUpperCase()+category.slice(1)} label:`);
+  if (!label?.trim()) return;
+  if (category === 'savings') {
+    const goal = parseFloat(prompt('Savings goal amount (or 0 for none):')) || 0;
+    state.budget.savings.push({ id: Date.now(), label: label.trim(), amount: 0, goal });
+  } else {
+    state.budget[category].push({ id: Date.now(), label: label.trim(), amount: 0, note: '' });
+  }
+  renderBudget();
+  scheduleSave();
+}
+
+// ═══════════════════════════════════════
+// MEAL PLANNING
+// ═══════════════════════════════════════
+function renderMeals() {
+  const m = state.meals;
+  document.getElementById('pageMeals').innerHTML = `
+    <div class="page-header">
+      <div class="page-eyebrow">Personal</div>
+      <div class="page-title">Meal Planning</div>
+      <div class="page-sub">Plan the week. Build the list. Eat well.</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">📅 This Week</div>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:8px;color:var(--muted);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Day</th>
+                <th style="text-align:left;padding:8px;color:var(--muted);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Breakfast</th>
+                <th style="text-align:left;padding:8px;color:var(--muted);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Lunch</th>
+                <th style="text-align:left;padding:8px;color:var(--muted);font-weight:700;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--border)">Dinner</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${m.days.map(day => `
+                <tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:8px;font-weight:700;color:var(--amber);white-space:nowrap">${day}</td>
+                  ${['breakfast','lunch','dinner'].map(meal => `
+                    <td style="padding:4px">
+                      <input type="text" value="${esc(m.plan[day]?.[meal]||'')}"
+                        placeholder="—"
+                        style="background:transparent;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:6px 4px;font-size:12px;width:100%"
+                        onchange="updateMeal('${day}','${meal}',this.value)"
+                        onfocus="this.style.borderColor='var(--amber)'"
+                        onblur="this.style.borderColor='var(--border)'">
+                    </td>`).join('')}
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">🛒 Grocery List</div>
+          <button class="btn btn-sm" onclick="addGroceryItem()">+ Add</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${m.groceries.map((item,i) => `
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="checkbox" ${item.done?'checked':''} onchange="toggleGrocery(${i})" style="width:16px;height:16px;flex-shrink:0;accent-color:var(--amber)">
+              <span style="flex:1;font-size:13px;${item.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(item.name)}</span>
+              <button onclick="removeGrocery(${i})" style="color:var(--muted);font-size:14px">×</button>
+            </div>`).join('')}
+          ${!m.groceries.length ? '<div style="font-size:12px;color:var(--muted);font-style:italic">No items yet. Add groceries above.</div>' : ''}
+        </div>
+        ${m.groceries.some(g=>g.done) ? `<button class="btn btn-sm" style="margin-top:12px;width:100%" onclick="clearDoneGroceries()">Clear completed</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function updateMeal(day, meal, value) {
+  if (!state.meals.plan[day]) state.meals.plan[day] = {};
+  state.meals.plan[day][meal] = value;
+  scheduleSave();
+}
+
+function addGroceryItem() {
+  const item = prompt('Add grocery item:');
+  if (!item?.trim()) return;
+  state.meals.groceries.push({ name: item.trim(), done: false });
+  renderMeals();
+  scheduleSave();
+}
+
+function toggleGrocery(idx) {
+  state.meals.groceries[idx].done = !state.meals.groceries[idx].done;
+  renderMeals();
+  scheduleSave();
+}
+
+function removeGrocery(idx) {
+  state.meals.groceries.splice(idx, 1);
+  renderMeals();
+  scheduleSave();
+}
+
+function clearDoneGroceries() {
+  state.meals.groceries = state.meals.groceries.filter(g => !g.done);
+  renderMeals();
+  scheduleSave();
 }
 
 // ═══════════════════════════════════════
