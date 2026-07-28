@@ -6144,9 +6144,15 @@ function renderWToday() {
       <div class="w-card">
         <div class="w-card-head"><div><div class="w-card-title">Open Blockers</div><div class="w-card-sub">Move these forward today</div></div></div>
         ${workState.blockers.map(b => `
-          <div class="w-blocker">
-            <div style="width:3px;height:28px;border-radius:4px;background:${b.severity==='high'?'#ef4444':'#f59e0b'};flex-shrink:0"></div>
-            <div style="flex:1"><div style="font-size:12px;font-weight:600">${wEsc(b.title)}</div><div style="font-size:10px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(b.owner)} · ${wEsc(b.age)}</div></div>
+          <div class="w-blocker" data-source="${b.source||'manual'}">
+            <div style="width:3px;min-height:28px;border-radius:4px;background:${b.source==='jobsmetrix'?'#f59e0b':b.severity==='high'?'#ef4444':'#f59e0b'};flex-shrink:0"></div>
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+                ${b.source==='jobsmetrix'?'<span style="font-size:9px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 5px;border-radius:5px">JM</span>':''}
+                <div style="font-size:12px;font-weight:600">${wEsc(b.title)}</div>
+              </div>
+              <div style="font-size:10px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(b.owner)} · ${wEsc(b.age)}</div>
+            </div>
           </div>`).join('')}
         ${!workState.blockers.length ? '<div style="font-size:12px;color:rgba(110,145,210,.4);font-style:italic;text-align:center;padding:12px">No open blockers.</div>' : ''}
       </div>
@@ -6241,10 +6247,14 @@ function renderWPriorities() {
         <button class="w-btn" onclick="wAddBlocker()">＋ Add blocker</button>
       </div>
       ${workState.blockers.map((b,i) => `
-        <div class="w-blocker">
-          <div style="width:3px;height:32px;border-radius:4px;flex-shrink:0;background:${b.severity==='high'?'#ef4444':b.severity==='medium'?'#f59e0b':'#3b82f6'}"></div>
+        <div class="w-blocker" data-source="${b.source||'manual'}">
+          <div style="width:3px;height:auto;min-height:32px;border-radius:4px;flex-shrink:0;background:${b.source==='jobsmetrix'?'#f59e0b':b.severity==='high'?'#ef4444':b.severity==='medium'?'#f59e0b':'#3b82f6'}"></div>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">${wEsc(b.title)}</div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              ${b.source==='jobsmetrix'?'<span style="font-size:10px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b;padding:2px 6px;border-radius:6px;border:1px solid rgba(245,158,11,.3)">JOBSMETRIX</span>':''}
+              <div style="font-size:13px;font-weight:600">${wEsc(b.title)}</div>
+            </div>
+            ${b.body ? `<div style="font-size:11px;color:rgba(234,240,251,.6);margin-top:3px">${wEsc(b.body)}</div>` : ''}
             <div style="font-size:10px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(b.owner)} · ${wEsc(b.age)} · <span style="text-transform:capitalize">${b.severity}</span></div>
           </div>
           <button onclick="wResolveBlocker(${i})" style="color:#3b82f6;font-size:11px;font-weight:700;background:none;border:none;cursor:pointer">Resolve</button>
@@ -6356,9 +6366,139 @@ function wAddCard(col) {
 // Load work state when Firebase auth is ready
 document.addEventListener('DOMContentLoaded', () => {
   const unsubscribe = firebase.auth().onAuthStateChanged(user => {
-    if (user) { loadWorkState(); unsubscribe(); }
+    if (user) {
+      loadWorkState().then(() => {
+        pullJobsMetrixNotifications(user.uid);
+      });
+      unsubscribe();
+    }
   });
 });
+
+// ═══════════════════════════════════════════════════════════
+// JOBSMETRIX → PLANNERXD NOTIFICATION BRIDGE
+// Reads plannerxd_notifications/{uid}/items from kytrac-72d91
+// and injects unread items into workState.blockers
+// ═══════════════════════════════════════════════════════════
+
+const JOBSMETRIX_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDoFC2N0rrgwO-vY8SCPb3J-jKgSLYn5BQ",
+  authDomain: "kytrac-72d91.firebaseapp.com",
+  projectId: "kytrac-72d91",
+  storageBucket: "kytrac-72d91.firebasestorage.app",
+  messagingSenderId: "1061786207687",
+  appId: "1:1061786207687:web:219bce6739311f43b205e2"
+};
+
+let _jmApp = null;
+let _jmDb = null;
+
+function getJobsMetrixDb() {
+  if (_jmDb) return _jmDb;
+  try {
+    // Use named app to avoid conflicts with PlannerXD's default Firebase app
+    const existing = firebase.apps.find(a => a.name === 'kytrac-notifications');
+    _jmApp = existing || firebase.initializeApp(JOBSMETRIX_FIREBASE_CONFIG, 'kytrac-notifications');
+    _jmDb = _jmApp.firestore();
+    return _jmDb;
+  } catch(e) {
+    console.warn('JOBSMETRIX bridge init error:', e);
+    return null;
+  }
+}
+
+async function pullJobsMetrixNotifications(uid) {
+  const db = getJobsMetrixDb();
+  if (!db || !uid) return;
+
+  try {
+    // Find the JOBSMETRIX team member whose uid matches this Google account
+    // Notifications are stored by JOBSMETRIX uid under plannerxd_notifications
+    const snap = await db.collection('plannerxd_notifications').doc(uid)
+      .collection('items')
+      .where('read', '==', false)
+      .orderBy('createdMs', 'desc')
+      .limit(20)
+      .get();
+
+    if (snap.empty) return;
+
+    const newBlockers = [];
+    const batch = db.batch();
+
+    snap.forEach(doc => {
+      const item = doc.data();
+
+      // Don't duplicate — check if already in blockers by source id
+      const alreadyExists = workState.blockers.some(b => b.jobsMetrixId === doc.id);
+      if (alreadyExists) return;
+
+      newBlockers.push({
+        id: Date.now() + Math.random(),
+        jobsMetrixId: doc.id,
+        title: item.title || 'JOBSMETRIX notification',
+        body: item.body || '',
+        owner: 'Travis',
+        age: '0 days',
+        severity: 'high',
+        source: 'jobsmetrix',
+        jobId: item.jobId || null,
+        createdMs: item.createdMs || Date.now()
+      });
+
+      // Mark as read in kytrac-72d91
+      batch.update(doc.ref, { read: true, readAt: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+
+    if (!newBlockers.length) return;
+
+    // Inject into blockers
+    workState.blockers = [...newBlockers, ...workState.blockers];
+    await batch.commit();
+    scheduleWorkSave();
+    renderWPriorities();
+
+    // Toast notification
+    showJMToast(`${newBlockers.length} new JOBSMETRIX notification${newBlockers.length > 1 ? 's' : ''} added to Blockers`);
+
+  } catch(e) {
+    // Silently fail — uid may not exist in JOBSMETRIX yet
+    console.warn('JOBSMETRIX notification pull error:', e);
+  }
+}
+
+// Simple non-blocking toast
+function showJMToast(msg) {
+  const existing = document.getElementById('jmToast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'jmToast';
+  toast.style.cssText = `
+    position:fixed;bottom:24px;right:24px;z-index:9999;
+    background:linear-gradient(135deg,#0d9488,#0f766e);
+    color:#fff;padding:14px 20px;border-radius:14px;
+    font-size:.88rem;font-weight:600;
+    box-shadow:0 8px 32px rgba(0,0,0,.4);
+    display:flex;align-items:center;gap:10px;
+    animation:jmSlideIn .3s ease;
+    max-width:320px;
+  `;
+  toast.innerHTML = `<span style="font-size:1.1rem">🔔</span><span>${msg}</span>
+    <button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;font-size:1rem;cursor:pointer;padding:0;margin-left:8px;opacity:.7">✕</button>`;
+  document.body.appendChild(toast);
+
+  setTimeout(() => { if (toast.parentElement) toast.remove(); }, 5000);
+}
+
+// Inject toast animation
+const jmStyle = document.createElement('style');
+jmStyle.textContent = `
+  @keyframes jmSlideIn { from { transform:translateY(20px);opacity:0; } to { transform:translateY(0);opacity:1; } }
+  .w-blocker[data-source="jobsmetrix"] { border-left: 3px solid #f59e0b; }
+`;
+document.head.appendChild(jmStyle);
+
 </script>
 
 <script>loadGoogleScripts();</script>
