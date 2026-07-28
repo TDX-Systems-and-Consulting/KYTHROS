@@ -18,7 +18,7 @@
     .topbar,.tabs,.card{background:linear-gradient(180deg, rgba(12,26,50,.95), rgba(7,17,33,.95));border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
     .topbar{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:18px 22px;margin-bottom:16px}
     .brand h1{margin:0;font-size:2rem;line-height:1.05}.brand p{margin:8px 0 0;color:var(--muted)}
-    .actions{display:flex;gap:10px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:rgba(17,34,65,.95);color:var(--text);padding:11px 15px;border-radius:14px;cursor:pointer}.btn:active{opacity:.8}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.btn{border:1px solid var(--line);background:rgba(17,34,65,.95);color:var(--text);padding:11px 15px;border-radius:14px;cursor:pointer;font-size:1rem;height:46px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.btn:active{opacity:.8}
     .btn-primary{background:linear-gradient(180deg,var(--blue),var(--blue2))}.btn-danger{background:linear-gradient(180deg,#c94343,#982d2d)}.btn-green{background:linear-gradient(180deg,#2fca97,#149869)}
     .tabs{display:flex;gap:10px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:10px 12px;margin-bottom:16px}.tabs::-webkit-scrollbar{display:none}.tab{background:transparent;border:1px solid transparent;color:var(--muted);padding:11px 16px;border-radius:13px;cursor:pointer;flex-shrink:0;white-space:nowrap}.tab.active,.subtab.active{background:linear-gradient(180deg,var(--blue),var(--blue2));color:#fff;border-color:rgba(255,255,255,.08)}
     .sync-option{display:flex;align-items:center;gap:12px;background:rgba(8,19,37,.6);border:1px solid rgba(110,145,210,.18);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
@@ -29,7 +29,7 @@
     .sync-option-icon{font-size:1.3rem;flex-shrink:0;width:32px;text-align:center}
     .sync-option-label{font-weight:700;font-size:.9rem}
     .sync-option-sub{font-size:.76rem;color:var(--muted);margin-top:2px}
-    .focus-btn{background:rgba(10,22,45,.6);border:1px solid rgba(110,145,210,.2);color:var(--muted);padding:11px 15px;border-radius:14px;cursor:pointer;font-size:1rem;font-weight:600;transition:border-color .15s,background .15s}
+    .focus-btn{background:rgba(10,22,45,.6);border:1px solid rgba(110,145,210,.2);color:var(--muted);padding:11px 15px;border-radius:14px;cursor:pointer;font-size:1rem;font-weight:600;height:46px;box-sizing:border-box;transition:border-color .15s,background .15s}
     .focus-btn:hover{border-color:rgba(110,145,210,.4)}
     .focus-btn.active{background:linear-gradient(180deg,var(--blue),var(--blue2));color:#fff;border-color:rgba(255,255,255,.08)}
     .page{display:none}.page.active{display:block}.card{overflow:clip}.card-head{padding:18px 18px 10px;display:flex;justify-content:space-between;align-items:center;gap:14px}.card-head h2,.card-head h3{margin:0}.card-head p{margin:4px 0 0;color:var(--muted)}.card-body{padding:18px}
@@ -230,12 +230,12 @@
     <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.7.0 · 28/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
-      <button class="btn" onclick="switchUser()" title="Switch User" style="padding:8px 10px">🔀</button>
+      <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
       <div class="focus-toggle">
         <button class="focus-btn active" id="modePersonal" onclick="setPlannerMode('personal',this)">Personal</button>
         <button class="focus-btn" id="modeWork" onclick="setPlannerMode('work',this)">Work</button>
       </div>
-      <button class="btn btn-primary" id="newTaskBtn" onclick="openTask()" style="display:inline-flex">+ Add Task</button>
+      <button class="btn btn-primary" id="newTaskBtn" onclick="openTask()">+ Add Task</button>
       <button class="btn" id="exportBtn" onclick="exportJson()" style="opacity:.55" title="Download a full backup of your workspace as a JSON file">⬇ Backup</button>
       <button class="btn btn-danger" onclick="signOut()" title="Sign out">Sign Out</button>
     </div>
@@ -3504,9 +3504,9 @@ function saveUserProfile(p){
 function uidPerson(){return 'p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function loadProfileRoster(){try{return JSON.parse(localStorage.getItem('kythros_profiles')||'[]');}catch{return [];}}
 function saveProfileRoster(r){localStorage.setItem('kythros_profiles',JSON.stringify(r));}
-function activeProfileId(){return sessionStorage.getItem('kythros_active_id')||null;}
-function setActiveProfileId(id){sessionStorage.setItem('kythros_active_id',id);}
-function clearActiveProfileId(){sessionStorage.removeItem('kythros_active_id');}
+function activeProfileId(){return localStorage.getItem('kythros_active_id')||null;}
+function setActiveProfileId(id){localStorage.setItem('kythros_active_id',id);}
+function clearActiveProfileId(){localStorage.removeItem('kythros_active_id');}
 
 function migrateOldProfileIfNeeded(){
   if(localStorage.getItem('kythros_profiles'))return;
