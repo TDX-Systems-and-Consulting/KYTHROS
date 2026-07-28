@@ -863,7 +863,7 @@ async function loadUserDataFromFirestore() {
       applyMigrationGuards();
     } else {
       // New user — check if admin (Travis) to seed data
-      if (_currentUser.email === ADMIN_EMAIL) {
+      if (ADMIN_EMAILS.includes(_currentUser.email)) {
         // Admin gets existing localStorage data if present
         const local = localStorage.getItem(STORAGE_KEY);
         if (local) {
@@ -1067,7 +1067,7 @@ window.signOut = signOut;
 const STRIPE_PUBLISHABLE_KEY = 'pk_test_51Txtq81ZsIK94nEl72oyoKWJsLH3NOPtYZERhjlP0EOkS7426Drl5xI5JIEVdrCPElsog12FfKh8u2ptkRX0252r000s0l9aVh';
 const STRIPE_PRICE_MONTHLY = 'price_1TxuQ31ZsIK94nEll86wIP1Z';
 const STRIPE_PRICE_LIFETIME = 'price_1TxuV51ZsIK94nElhdxrvKUE';
-const ADMIN_EMAILS = ['travis@jtxdgroup.com', 'travisdurbin73@gmail.com', 'Juliad42017@gmail.com'];
+const ADMIN_EMAILS = ['travis@jtxdgroup.com', 'travis@7pillarsgroup.com', 'travisdurbin73@gmail.com', 'Juliad42017@gmail.com'];
 
 let _stripe = null;
 
