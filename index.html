@@ -6123,7 +6123,13 @@ function renderWToday() {
       ${doFirst.map(t => `
         <div class="w-task ${t.done?'done':''}">
           <button class="w-check" onclick="wToggleTask(${t.id})">✓</button>
-          <div style="flex:1"><span style="font-size:13px;font-weight:600">${wEsc(t.title)}</span>${t.note?`<div style="font-size:11px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(t.note)}</div>`:''}</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              ${t.source==='jobsmetrix'?'<span style="font-size:9px;font-weight:800;background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 5px;border-radius:5px;border:1px solid rgba(245,158,11,.3)">JM</span>':''}
+              <span style="font-size:13px;font-weight:600">${wEsc(t.title)}</span>
+            </div>
+            ${t.note?`<div style="font-size:11px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(t.note)}</div>`:''}
+          </div>
           <button onclick="wDeleteTask(${t.id})" style="color:rgba(110,145,210,.3);font-size:16px;background:none;border:none;cursor:pointer">×</button>
         </div>`).join('')}
       ${!doFirst.length ? '<div style="text-align:center;padding:24px;color:rgba(110,145,210,.4);font-size:13px;font-style:italic">Urgent lane is clear. Nice work.</div>' : ''}
@@ -6427,43 +6433,38 @@ async function pullJobsMetrixNotifications(uid) {
 
     if (snap.empty) return;
 
-    const newBlockers = [];
+    const newTasks = [];
     const batch = db.batch();
 
     snap.forEach(doc => {
       const item = doc.data();
 
-      // Don't duplicate — check if already in blockers by source id
-      const alreadyExists = workState.blockers.some(b => b.jobsMetrixId === doc.id);
+      const alreadyExists = workState.tasks.some(t => t.jobsMetrixId === doc.id);
       if (alreadyExists) return;
 
-      newBlockers.push({
+      newTasks.push({
         id: Date.now() + Math.random(),
         jobsMetrixId: doc.id,
         title: item.title || 'JOBSMETRIX notification',
-        body: item.body || '',
-        owner: 'Travis',
-        age: '0 days',
-        severity: 'high',
+        note: item.body || '',
+        quadrant: 'do',
+        done: false,
         source: 'jobsmetrix',
         jobId: item.jobId || null,
         createdMs: item.createdMs || Date.now()
       });
 
-      // Mark as read in kytrac-72d91
       batch.update(doc.ref, { read: true, readAt: firebase.firestore.FieldValue.serverTimestamp() });
     });
 
-    if (!newBlockers.length) return;
+    if (!newTasks.length) return;
 
-    // Inject into blockers
-    workState.blockers = [...newBlockers, ...workState.blockers];
+    workState.tasks = [...newTasks, ...workState.tasks];
     await batch.commit();
     scheduleWorkSave();
     renderWPriorities();
 
-    // Toast notification
-    showJMToast(`${newBlockers.length} new JOBSMETRIX notification${newBlockers.length > 1 ? 's' : ''} added to Blockers`);
+    showJMToast(`${newTasks.length} new JOBSMETRIX task${newTasks.length > 1 ? 's' : ''} added to Do First`);
 
   } catch(e) {
     console.warn('JOBSMETRIX notification pull error:', e);
