@@ -6409,12 +6409,14 @@ function getJobsMetrixDb() {
 
 async function pullJobsMetrixNotifications(uid) {
   const db = getJobsMetrixDb();
-  if (!db || !uid) return;
+  if (!db || !_currentUser) return;
+
+  // Use email as the key — same across both Firebase projects
+  const emailKey = (_currentUser.email || '').replace(/\./g, '_').replace(/@/g, '_at_');
+  if (!emailKey) return;
 
   try {
-    // Find the JOBSMETRIX team member whose uid matches this Google account
-    // Notifications are stored by JOBSMETRIX uid under plannerxd_notifications
-    const snap = await db.collection('plannerxd_notifications').doc(uid)
+    const snap = await db.collection('plannerxd_notifications').doc(emailKey)
       .collection('items')
       .where('read', '==', false)
       .orderBy('createdMs', 'desc')
