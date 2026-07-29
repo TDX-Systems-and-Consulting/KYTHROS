@@ -6419,7 +6419,6 @@ async function pullJobsMetrixNotifications(uid) {
     const snap = await db.collection('plannerxd_notifications').doc(emailKey)
       .collection('items')
       .where('read', '==', false)
-      .orderBy('createdMs', 'desc')
       .limit(20)
       .get();
 
