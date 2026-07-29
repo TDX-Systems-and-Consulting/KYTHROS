@@ -6409,11 +6409,12 @@ function getJobsMetrixDb() {
 
 async function pullJobsMetrixNotifications(uid) {
   const db = getJobsMetrixDb();
-  if (!db || !_currentUser) return;
+  if (!db || !_currentUser) { console.warn('JM bridge: no db or user'); return; }
 
-  // Use email as the key — same across both Firebase projects
   const emailKey = (_currentUser.email || '').replace(/\./g, '_').replace(/@/g, '_at_');
-  if (!emailKey) return;
+  if (!emailKey) { console.warn('JM bridge: no email key'); return; }
+
+  console.log('JM bridge: checking notifications for', emailKey);
 
   try {
     const snap = await db.collection('plannerxd_notifications').doc(emailKey)
@@ -6421,6 +6422,8 @@ async function pullJobsMetrixNotifications(uid) {
       .where('read', '==', false)
       .limit(20)
       .get();
+
+    console.log('JM bridge: found', snap.size, 'unread notifications');
 
     if (snap.empty) return;
 
@@ -6463,7 +6466,6 @@ async function pullJobsMetrixNotifications(uid) {
     showJMToast(`${newBlockers.length} new JOBSMETRIX notification${newBlockers.length > 1 ? 's' : ''} added to Blockers`);
 
   } catch(e) {
-    // Silently fail — uid may not exist in JOBSMETRIX yet
     console.warn('JOBSMETRIX notification pull error:', e);
   }
 }
