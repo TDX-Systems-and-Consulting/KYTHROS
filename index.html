@@ -6415,15 +6415,12 @@ function getJobsMetrixDb() {
 
 async function pullJobsMetrixNotifications(uid) {
   const db = getJobsMetrixDb();
-  if (!db || !_currentUser) { console.warn('JM bridge: no db or user'); return; }
+  if (!db || !uid) { console.warn('JM bridge: no db or uid'); return; }
 
-  const emailKey = (_currentUser.email || '').replace(/\./g, '_').replace(/@/g, '_at_');
-  if (!emailKey) { console.warn('JM bridge: no email key'); return; }
-
-  console.log('JM bridge: checking notifications for', emailKey);
+  console.log('JM bridge: checking notifications for uid', uid);
 
   try {
-    const snap = await db.collection('plannerxd_notifications').doc(emailKey)
+    const snap = await db.collection('plannerxd_notifications').doc(uid)
       .collection('items')
       .where('read', '==', false)
       .limit(20)
