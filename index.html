@@ -6273,8 +6273,7 @@ function renderWPriorities() {
 // WORK: OFFICE KANBAN
 // ═══════════════════════════════════════
 const W_COLS = ['Backlog','In progress','Review','Done'];
-
-function renderWKanban() {
+const W_TAGS = ['marketing','office','equipment','operations','website'];
   document.getElementById('workContent').innerHTML = `
     <div style="margin-bottom:20px">
       <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:rgba(110,145,210,.5);text-transform:uppercase;margin-bottom:6px">Business Around the Business</div>
@@ -6359,9 +6358,6 @@ function wResolveBlocker(idx) {
     renderWPriorities();
   }
 }
-
-const W_TAGS = ['marketing','office','equipment','operations','website'];
-const W_COLS = ['Backlog','In progress','Review','Done'];
 
 function wAddCard(col) {
   // Open modal in add mode
