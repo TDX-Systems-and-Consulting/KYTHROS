@@ -227,7 +227,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.7.1 · 30/Jul/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.7.2 · 30/Jul/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -6274,6 +6274,8 @@ function renderWPriorities() {
 // ═══════════════════════════════════════
 const W_COLS = ['Backlog','In progress','Review','Done'];
 const W_TAGS = ['marketing','office','equipment','operations','website'];
+
+function renderWKanban() {
   document.getElementById('workContent').innerHTML = `
     <div style="margin-bottom:20px">
       <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:rgba(110,145,210,.5);text-transform:uppercase;margin-bottom:6px">Business Around the Business</div>
