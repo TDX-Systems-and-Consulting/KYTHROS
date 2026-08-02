@@ -241,7 +241,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.6 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.7 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -6167,12 +6167,12 @@ function renderWToday() {
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
       ${[
-        {icon:'🔴',label:`${doFirst.length} do first`,sub:'Urgent · Important',c:'rgba(239,68,68,.15)'},
-        {icon:'📋',label:`${scheduled.length} scheduled`,sub:'Important · Next',c:'rgba(59,130,246,.15)'},
-        {icon:'⚠️',label:`${workState.blockers.length} blockers`,sub:'Awaiting resolution',c:'rgba(245,158,11,.15)'},
-        {icon:'✅',label:`${health}% on track`,sub:'Quarterly priorities',c:'rgba(16,185,129,.15)'},
+        {icon:'🔴',label:`${doFirst.length} do first`,sub:'Urgent · Important',c:'rgba(239,68,68,.15)',page:'wMatrix'},
+        {icon:'📋',label:`${scheduled.length} scheduled`,sub:'Important · Next',c:'rgba(59,130,246,.15)',page:'wMatrix'},
+        {icon:'⚠️',label:`${workState.blockers.length} blockers`,sub:'Awaiting resolution',c:'rgba(245,158,11,.15)',page:'wPriorities'},
+        {icon:'✅',label:`${health}% on track`,sub:'Quarterly priorities',c:'rgba(16,185,129,.15)',page:'wPriorities'},
       ].map(t => `
-        <div class="w-card" style="padding:14px;display:flex;align-items:center;gap:10px">
+        <div class="w-card" style="padding:14px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="workNav('${t.page}',document.querySelector('.work-nav[data-wpage=${t.page}]'))">
           <div style="width:36px;height:36px;border-radius:10px;background:${t.c};display:grid;place-items:center;font-size:17px;flex-shrink:0">${t.icon}</div>
           <div><strong style="font-size:12px;display:block">${t.label}</strong><small style="font-size:10px;color:rgba(110,145,210,.6)">${t.sub}</small></div>
         </div>`).join('')}
