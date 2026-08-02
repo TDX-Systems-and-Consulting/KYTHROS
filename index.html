@@ -87,6 +87,15 @@
          against a white page; softened specifically for Light. */
       --blue:#6d94e0;--blue2:#4f74c2;
     }
+    /* Matches the soft translucent-fill look Morning Briefing already
+       uses (rgba gradient + colored border + colored text) instead of
+       .btn-primary's solid gradient fill — same softer feel, just
+       applied to every primary button rather than one. */
+    html[data-theme="light"] .btn-primary {
+      background: linear-gradient(135deg, rgba(109,148,224,.18), rgba(79,116,194,.18)) !important;
+      border: 1px solid rgba(109,148,224,.4);
+      color: #3a5a9e;
+    }
     html[data-theme="light"] [style*="#ffe09d"] { color: #92400e !important; }
     html[data-theme="light"] [style*="#a3f2d2"] { color: #047857 !important; }
     html[data-theme="light"] [style*="#ffc0be"] { color: #b91c1c !important; }
@@ -330,7 +339,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.4 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.5 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
