@@ -346,7 +346,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.6 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.7 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -368,7 +368,6 @@
 
   <div class="tabs" id="mainTabs">
     <button class="tab active" data-page="dashboardPage" onclick="switchTab('dashboardPage',this)">Dashboard</button>
-    <button class="tab" data-page="familyPage" onclick="switchTab('familyPage',this)">Family</button>
     <button class="tab" data-page="projectsPage" onclick="switchTab('projectsPage',this)">Projects</button>
     <button class="tab" data-page="notesPage" onclick="switchTab('notesPage',this)">Notes</button>
     <button class="tab" data-page="timelinePage" onclick="switchTab('timelinePage',this)">Timeline</button>
@@ -2269,10 +2268,10 @@ function setEventType(type){
 let _focusMode=localStorage.getItem('kythros_focus_mode')||'full';
 
 const FOCUS_TABS={
-  full:   ['dashboardPage','familyPage','projectsPage','notesPage','timelinePage','calendarPage','budgetPage','recipesPage','kythyPage'],
+  full:   ['dashboardPage','projectsPage','notesPage','timelinePage','calendarPage','budgetPage','recipesPage','kythyPage'],
   work:   ['dashboardPage','projectsPage','notesPage','timelinePage','calendarPage','budgetPage','kythyPage'],
-  home:   ['dashboardPage','familyPage','calendarPage','budgetPage','notesPage','recipesPage','kythyPage'],
-  family: ['dashboardPage','familyPage','calendarPage','recipesPage']
+  home:   ['dashboardPage','calendarPage','budgetPage','notesPage','recipesPage','kythyPage'],
+  family: ['dashboardPage','calendarPage','recipesPage']
 };
 
 const FOCUS_LABELS={
