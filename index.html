@@ -81,6 +81,11 @@
       --card-bg:linear-gradient(180deg,#ffffff,#f7f8fa);
       --amber-dim:rgba(245,158,11,.10);--amber-border:rgba(245,158,11,.32);
       --shadow:0 4px 18px rgba(15,23,42,.10);
+      /* Primary CTA buttons (.btn-primary already references these two
+         vars, so this alone re-colors every one of them) — the full-
+         saturation blue used in Dark/Black felt too high-contrast/loud
+         against a white page; softened specifically for Light. */
+      --blue:#6d94e0;--blue2:#4f74c2;
     }
     html[data-theme="light"] [style*="#ffe09d"] { color: #92400e !important; }
     html[data-theme="light"] [style*="#a3f2d2"] { color: #047857 !important; }
@@ -325,7 +330,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.3 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.4 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
