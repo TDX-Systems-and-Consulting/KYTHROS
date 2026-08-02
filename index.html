@@ -241,7 +241,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.7 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.8 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -6214,6 +6214,7 @@ function renderWToday() {
             <span class="${p.up?'w-trend-up':'w-trend-dn'}">${p.trend}</span>
             <button onclick="wDeletePulse(${i})" title="Remove metric" style="background:none;border:none;color:rgba(110,145,210,.4);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1">×</button>
           </div>`).join('')}
+        ${wRenderJmPulseRows()}
       </div>
       <div class="w-card">
         <div class="w-card-head"><div><div class="w-card-title">Open Blockers</div><div class="w-card-sub">Move these forward today</div></div></div>
@@ -6316,6 +6317,7 @@ function renderWPriorities() {
             <span class="${p.up?'w-trend-up':'w-trend-dn'}">${p.trend}</span>
             <button onclick="wDeletePulse(${i})" title="Remove metric" style="background:none;border:none;color:rgba(110,145,210,.4);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1">×</button>
           </div>`).join('')}
+        ${wRenderJmPulseRows()}
       </div>
     </div>
 
@@ -6600,6 +6602,7 @@ document.addEventListener('DOMContentLoaded', () => {
           wRenderCurrentPage();
         }
         pullJobsMetrixNotifications(user.uid);
+        subscribeJobsMetrixPulse(user.uid);
       });
       unsubscribe();
     }
@@ -6636,6 +6639,42 @@ function getJobsMetrixDb() {
     console.warn('JOBSMETRIX bridge init error:', e);
     return null;
   }
+}
+
+// ── Live JOBSMETRIX Weekly Pulse rows ──────────────────────────────
+// Separate from workState.pulse on purpose: these numbers are live
+// and re-fetched, not something the user owns or edits, so they're
+// never written into workState / saved to Firestore. A real-time
+// onSnapshot listener keeps them current while the tab is open,
+// rendered as extra rows in the Weekly Pulse card with a JM badge and
+// no delete button (there's nothing to delete — it's just a mirror).
+let jmPulseSync = null;
+
+function subscribeJobsMetrixPulse(uid) {
+  const db = getJobsMetrixDb();
+  if (!db || !uid) return;
+  db.collection('plannerxd_pulse_sync').doc(uid).onSnapshot(doc => {
+    jmPulseSync = doc.exists ? doc.data() : null;
+    if (document.getElementById('workModePanel')?.style.display !== 'none') {
+      wRenderCurrentPage();
+    }
+  }, err => console.warn('JOBSMETRIX pulse sync listener error:', err));
+}
+
+function wRenderJmPulseRows() {
+  if (!jmPulseSync) return '';
+  const rows = [
+    { label: 'Active jobs', value: jmPulseSync.activeJobs },
+    { label: 'Outstanding invoices', value: jmPulseSync.outstandingInvoices != null ? '$' + jmPulseSync.outstandingInvoices.toLocaleString() : null },
+    { label: 'Unprocessed change orders', value: jmPulseSync.unprocessedCOs },
+  ].filter(r => r.value !== null && r.value !== undefined);
+  if (!rows.length) return '';
+  return rows.map(r => `
+    <div class="w-pulse-row">
+      <span style="font-size:9px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 5px;border-radius:5px;margin-right:6px">JM</span>
+      <span style="font-size:11px;color:rgba(110,145,210,.6);flex:1">${wEsc(r.label)}</span>
+      <span style="font-size:14px;font-weight:800">${wEsc(String(r.value))}</span>
+    </div>`).join('');
 }
 
 async function pullJobsMetrixNotifications(uid) {
