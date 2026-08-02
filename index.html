@@ -241,7 +241,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.5 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.6 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -6153,7 +6153,7 @@ function wEsc(str) {
 function renderWToday() {
   const doFirst = workState.tasks.filter(t => t.quadrant === 'do' && !t.done);
   const scheduled = workState.tasks.filter(t => t.quadrant === 'schedule' && !t.done);
-  const health = Math.round(workState.priorities.reduce((s,p) => s+p.progress,0) / workState.priorities.length);
+  const health = workState.priorities.length ? Math.round(workState.priorities.reduce((s,p) => s+p.progress,0) / workState.priorities.length) : 0;
   const d = new Date();
   const hrs = d.getHours();
   const greeting = hrs < 12 ? 'Good morning' : hrs < 17 ? 'Good afternoon' : 'Good evening';
@@ -6280,7 +6280,7 @@ function renderWMatrix() {
 // WORK: PRIORITIES & PULSE
 // ═══════════════════════════════════════
 function renderWPriorities() {
-  const health = Math.round(workState.priorities.reduce((s,p) => s+p.progress,0) / workState.priorities.length);
+  const health = workState.priorities.length ? Math.round(workState.priorities.reduce((s,p) => s+p.progress,0) / workState.priorities.length) : 0;
   document.getElementById('workContent').innerHTML = `
     <div style="margin-bottom:24px">
       <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:rgba(110,145,210,.5);text-transform:uppercase;margin-bottom:6px">Leadership Rhythm</div>
@@ -6302,7 +6302,9 @@ function renderWPriorities() {
               <div class="w-pbar"><div class="w-pbar-fill" style="width:${p.progress}%"></div></div>
             </div>
             <div style="font-size:13px;font-weight:800;color:#3b82f6;flex-shrink:0">${p.progress}%</div>
+            <button onclick="wDeletePriority(${i})" title="Remove priority" style="background:none;border:none;color:rgba(110,145,210,.4);cursor:pointer;font-size:16px;padding:0;flex-shrink:0">×</button>
           </div>`).join('')}
+        ${!workState.priorities.length ? '<div style="font-size:12px;color:rgba(110,145,210,.4);font-style:italic;text-align:center;padding:16px 0">No priorities set.</div>' : ''}
         <button class="w-btn" style="margin-top:12px;width:100%;font-size:12px" onclick="wAddPriority()">＋ Add priority</button>
       </div>
       <div class="w-card">
@@ -6450,6 +6452,14 @@ function wAddPriority() {
   workState.priorities.push({ id: Date.now(), title: title.trim(), owner, due, progress: 0 });
   scheduleWorkSave();
   renderWPriorities();
+}
+
+function wDeletePriority(idx) {
+  if (confirm('Remove this priority?')) {
+    workState.priorities.splice(idx, 1);
+    scheduleWorkSave();
+    wRenderCurrentPage();
+  }
 }
 
 function wAddBlocker() {
