@@ -241,7 +241,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.9 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.9.0 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -2019,6 +2019,50 @@ function allCalendarEvents(){
   if(_focusMode==='work')calendarTasks=calendarTasks.filter(t=>t.stream&&t.stream!=='');
   else if(_focusMode==='home')calendarTasks=calendarTasks.filter(t=>!t.stream||t.stream==='');
   else if(_focusMode==='family')calendarTasks=calendarTasks.filter(t=>(t.privacy||'private')==='public'||(t.privacy||'private')==='focus');
+  // Self-healing fix: some tasks got a literal time range typed into the
+  // title (e.g. "[7:00-7:15am] Something") instead of using the separate
+  // Start/End Time fields. With startTime empty, those show up on the
+  // calendar as "All day" events with the ugly bracket text still in the
+  // title, instead of sitting in their correct time slot. Detect that
+  // pattern once and repair the underlying task (clean title + real
+  // startTime/endTime) so it's fixed everywhere the task appears, not
+  // just this render.
+  let _fixedBracketTimes=false;
+  const bracketTimeRe=/^\[\s*(\d{1,2}):(\d{2})\s*([ap]\.?m?\.?)?\s*-\s*(\d{1,2}):(\d{2})\s*([ap]\.?m?\.?)\s*\]\s*/i;
+  const to24h=(h,m,ampm)=>{
+    h=parseInt(h,10);
+    if(ampm){
+      const isPM=/^p/i.test(ampm);
+      if(isPM&&h!==12)h+=12;
+      if(!isPM&&h===12)h=0;
+    }
+    return String(h).padStart(2,'0')+':'+m;
+  };
+  calendarTasks.forEach(t=>{
+    if(t.startTime)return; // already has a real time, nothing to fix
+    const m=bracketTimeRe.exec(t.title||'');
+    if(!m)return;
+    const [,h1,m1,ampm1,h2,m2,ampm2]=m;
+    // Only one of the two times may carry an am/pm marker (common
+    // shorthand: "[7:00-7:15am]" means both ends are am). Guess by
+    // sharing the marker that IS present; if that guess produces a
+    // start time on/after the end time (nonsensical for a due-time
+    // range), the shared marker must have been wrong for whichever
+    // side didn't have it explicitly — flip that side's inferred
+    // period and use the corrected version instead.
+    const flip=p=>p&&/^a/i.test(p)?'pm':'am';
+    let startAmPm=ampm1||ampm2, endAmPm=ampm2||ampm1;
+    let startTime=to24h(h1,m1,startAmPm), endTime=to24h(h2,m2,endAmPm);
+    if(startTime>=endTime){
+      if(!ampm1&&ampm2){ startAmPm=flip(ampm2); startTime=to24h(h1,m1,startAmPm); }
+      else if(!ampm2&&ampm1){ endAmPm=flip(ampm1); endTime=to24h(h2,m2,endAmPm); }
+    }
+    t.startTime=startTime;
+    t.endTime=endTime;
+    t.title=t.title.replace(bracketTimeRe,'').trim()||t.title;
+    _fixedBracketTimes=true;
+  });
+  if(_fixedBracketTimes)saveState();
   const taskEvents=calendarTasks
     .map(t=>({id:`task-${t.id}`,title:`Due: ${t.title}`,date:t.due,startTime:t.startTime||'',endTime:t.endTime||'',location:t.project||'',notes:t.status,source:'task',taskId:t.id,stream:t.stream||'',_project:t.project||''}));
   let googleEvents=(gcalEvents||[]).map(e=>({...e,source:'gcal'}));
