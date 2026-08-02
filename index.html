@@ -4,6 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>PlannerXD — Personal Life OS</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#05101d" />
+  <link rel="icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <style>
     :root{
       --bg:#05101d;--bg2:#0a1830;--panel:rgba(10,22,45,.92);--panel2:rgba(14,29,58,.94);--line:rgba(110,145,210,.20);
@@ -235,7 +241,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.2 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.3 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -837,6 +843,21 @@ function initFirebase() {
     _fbAuth = firebase.auth();
     _fbDb = firebase.firestore();
     _firestoreReady = true;
+
+    // ── Offline persistence ──────────────────────────────────────────
+    // Same reasoning as JOBSMETRIX: queues Firestore reads/writes in
+    // IndexedDB so the app keeps working with no signal and syncs on
+    // reconnect automatically. synchronizeTabs:true so a second open
+    // tab shares the cache instead of falling back to memory-only.
+    _fbDb.enablePersistence({ synchronizeTabs: true }).catch(err => {
+      if (err.code === 'failed-precondition') {
+        console.warn('Firestore persistence: multiple tabs open without synchronizeTabs support — this tab will run without offline cache.');
+      } else if (err.code === 'unimplemented') {
+        console.warn('Firestore persistence: browser does not support required APIs (private/incognito mode or old browser) — running online-only.');
+      } else {
+        console.warn('Firestore persistence failed to enable:', err);
+      }
+    });
 
     _fbAuth.onAuthStateChanged(async (user) => {
       if (user) {
@@ -6653,6 +6674,18 @@ document.head.appendChild(jmStyle);
 </script>
 
 <script>loadGoogleScripts();</script>
+
+<script>
+  // Register PWA service worker for installability + offline app-shell
+  // loading. After window load so it never delays the app's own boot.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+</script>
 
 </body>
 </html>
