@@ -241,7 +241,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.3 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.4 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -6545,6 +6545,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const unsubscribe = firebase.auth().onAuthStateChanged(user => {
     if (user) {
       loadWorkState().then(() => {
+        // workState just got overwritten with the real Firestore data
+        // (replacing the hardcoded sample defaults it starts out with).
+        // If the Work tab is already visible — either because the user
+        // clicked into it before this async load finished, or a future
+        // change makes 'work' the remembered/default mode — nothing
+        // else repaints the screen, so the sample data would otherwise
+        // stay visible even though the correct (possibly empty, if
+        // everything was deleted) data is now in memory. Re-render
+        // whichever Work page is currently active to fix that.
+        if (document.getElementById('workModePanel')?.style.display !== 'none') {
+          const renders = { wToday: renderWToday, wMatrix: renderWMatrix, wPriorities: renderWPriorities, wKanban: renderWKanban };
+          (renders[currentWorkPage] || renderWToday)();
+        }
         pullJobsMetrixNotifications(user.uid);
       });
       unsubscribe();
