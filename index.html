@@ -71,7 +71,7 @@
     .stream-card-kythros{box-shadow:0 18px 42px rgba(0,0,0,.32),inset 4px 0 0 #fb923c!important}
     .stream-card-realestate{box-shadow:0 18px 42px rgba(0,0,0,.32),inset 4px 0 0 #38bdf8!important}
     .stream-card-eos{box-shadow:0 18px 42px rgba(0,0,0,.32),inset 4px 0 0 #84cc16!important}
-    .stream-card-multientity{box-shadow:0 18px 42px rgba(0,0,0,.32),inset 4px 0 0 #ec4899!important}
+    .stream-card-multientity{box-shadow:0 18px 42px rgba(0,0,0,.32),inset 4px 0 0 #0ea5e9!important}
     .stream-card-jobsmetrix{box-shadow:0 18px 42px rgba(0,0,0,.32),inset 4px 0 0 #6366f1!important}
     .stream-overview-card:hover{opacity:.88;transform:translateY(-1px);transition:opacity .15s,transform .15s}
     /* ── Import preview ── */
@@ -241,7 +241,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.9.0 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.9.1 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -2427,7 +2427,7 @@ function renderProjectBudget(){
   const stream=getActiveStream();
   const pb=getProjectBudget(stream);
   const streamNames={'383':'383 Men\'s Conference','STONEHAVEN':'Stonehaven Church Plant','MINISTRY':'Ministry & Content','315':'The 3:15 Project','KYTHROS':'KYTHROS Launch','REALESTATE':'Real Estate Licensing','EOS':'Learning EOS','MULTIENTITY':'Multi-Entity Operations','JOBSMETRIX':'JOBSMETRIX Launch'};
-  const streamColors={'383':'#d4a017','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946','KYTHROS':'#fb923c','REALESTATE':'#38bdf8','EOS':'#84cc16','MULTIENTITY':'#ec4899','JOBSMETRIX':'#6366f1'};
+  const streamColors={'383':'#d4a017','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946','KYTHROS':'#fb923c','REALESTATE':'#38bdf8','EOS':'#84cc16','MULTIENTITY':'#0ea5e9','JOBSMETRIX':'#6366f1'};
   const col=streamColors[stream]||'#4d8dff';
   const titleEl=document.getElementById('projPLTitle');
   if(titleEl)titleEl.textContent=`${stream} — ${streamNames[stream]||stream}`;
@@ -5796,7 +5796,7 @@ function renderCalDay(){
 }
 
 function getEventColor(e){
-  if(e.stream){const m={'383':'#d4a017','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946','KYTHROS':'#fb923c','REALESTATE':'#38bdf8','EOS':'#84cc16','MULTIENTITY':'#ec4899','JOBSMETRIX':'#6366f1'};return m[e.stream]||'#4d8dff';}
+  if(e.stream){const m={'383':'#d4a017','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946','KYTHROS':'#fb923c','REALESTATE':'#38bdf8','EOS':'#84cc16','MULTIENTITY':'#0ea5e9','JOBSMETRIX':'#6366f1'};return m[e.stream]||'#4d8dff';}
   if(e.source==='gcal')return'#1dbb87';
   if(e.source==='task')return'#d4a017';
   return'#4d8dff';
