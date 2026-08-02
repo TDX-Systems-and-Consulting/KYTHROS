@@ -346,7 +346,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.7 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.8 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -529,7 +529,7 @@
           <div id="calDayView" style="display:none;overflow:auto"><div id="calDayGrid" style="min-width:320px"></div></div>
         </div>
       </div>
-      <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>My Calendars</h2><p>Show or hide individual calendars.</p></div></div><div class="card-body" id="calendarSidebar"><p class="muted small">Connect Google Calendar to see calendars here.</p></div></div>
+      <div class="card" id="myCalendarsCard" style="margin-bottom:16px"><div class="card-head"><div><h2>My Calendars</h2><p>Show or hide individual calendars.</p></div></div><div class="card-body" id="calendarSidebar"><p class="muted small">Connect Google Calendar to see calendars here.</p></div></div>
       <div class="card"><div class="card-head"><div><h2>Upcoming</h2><p>Next 10 events and task deadlines.</p></div></div><div class="card-body" id="upcomingList" style="display:flex;flex-direction:column;gap:10px"></div></div>
     </div>
   </section>
@@ -1799,16 +1799,20 @@ function setCalColor(calId,color){const c=loadCalColors();c[calId]=color;saveCal
 function toggleCalVisibility(calId){const h=loadHiddenCals();if(h.has(calId))h.delete(calId);else h.add(calId);saveHiddenCals(h);renderCalendarSidebar();renderCalendar();}
 function renderCalendarSidebar(){
   const el=document.getElementById('calendarSidebar');if(!el)return;
+  const card=document.getElementById('myCalendarsCard');
   const hidden=loadHiddenCals();
   const seen=new Map();
   (gcalEvents||[]).forEach(e=>{if(e._calId&&!seen.has(e._calId))seen.set(e._calId,e._calName||e._calId);});
   if(seen.size===0){
-    const connected=gcalState.connected||hasGoogleToken();
-    el.innerHTML=connected
-      ?'<p class="muted small">No calendars found yet — try Sync Drive above, or check back after your next sync.</p>'
-      :'<p class="muted small">Connect Google Calendar to see calendars here.</p>';
+    // Nothing useful to show either way (not connected, or connected
+    // but no calendar IDs discovered in synced events yet) — hide the
+    // whole card rather than a mostly-empty placeholder that still
+    // eats a third of the page width. Upcoming (the card below it)
+    // just moves up to fill the space.
+    if(card)card.style.display='none';
     return;
   }
+  if(card)card.style.display='';
   el.innerHTML=[...seen.entries()].map(([id,name])=>{
     const col=getCalColor(id,name);
     return`<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(110,145,210,.08)">
@@ -4740,7 +4744,7 @@ function renderDashMealsToday(){
 }
 // ════════════════════════════════════════════════════
 
-function renderAll(){renderDashboard();renderFilters();const tasks=filteredTasks();renderStats(tasks);renderGantt(tasks);renderKanban(tasks);renderList(tasks);renderEisenhower();renderCalendar();renderBudget();renderNotesList();loadSelectedNoteIntoEditor();renderRecipes();renderGcalStatus();renderTimeline();renderFamilyPage();renderGoals();renderWeeklyReview();renderRocks();renderScorecard();renderIssues();}
+function renderAll(){renderDashboard();renderFilters();const tasks=filteredTasks();renderStats(tasks);renderGantt(tasks);renderKanban(tasks);renderList(tasks);renderEisenhower();renderCalendar();renderCalendarSidebar();renderBudget();renderNotesList();loadSelectedNoteIntoEditor();renderRecipes();renderGcalStatus();renderTimeline();renderFamilyPage();renderGoals();renderWeeklyReview();renderRocks();renderScorecard();renderIssues();}
 
 // ════════════════════════════════════════════════════
 // ── TIMELINE SYSTEM ──
