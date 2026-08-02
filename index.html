@@ -342,7 +342,7 @@
       <div class="card-body">
         <div class="import-info">
           <strong>CSV columns (13):</strong> <code>date</code>, <code>stream</code>, <code>type</code>, <code>timeline_id</code>, <code>title</code>, <code>owner</code>, <code>priority</code>, <code>window_start</code>, <code>window_due</code>, <code>phase</code>, <code>calendar_item</code>, <code>dependencies</code>, <code>description</code><br/>
-          <strong>Streams:</strong> <code>383</code> · <code>STONEHAVEN</code> · <code>MINISTRY</code> · <code>315</code> · <code>KYTHROS</code> · <code>REALESTATE</code> · <code>EOS</code> · <code>MULTIENTITY</code> · <code>JOBSMETRIX</code> &nbsp;|&nbsp;
+          <strong>Streams:</strong> any value works — no restriction. <code>383</code> · <code>STONEHAVEN</code> · <code>MINISTRY</code> · <code>315</code> · <code>KYTHROS</code> · <code>REALESTATE</code> · <code>EOS</code> · <code>MULTIENTITY</code> · <code>JOBSMETRIX</code> have dedicated colors; anything else uses a default style. &nbsp;|&nbsp;
           <strong>Types:</strong> <code>BEGIN</code> · <code>DUE</code> · <code>MILESTONE</code> · <code>LOCK_DECISION</code> · <code>PHASE_BEGINS</code> · <code>PHASE_MILESTONE</code> · <code>SERMON</code> · <code>BLOG</code> · <code>ROLE_BEGIN</code><br/>
           Duplicates (same <code>timeline_id</code> + <code>stream</code>) are skipped automatically. DUE rows referencing an existing BEGIN are skipped. Download the template to see example rows.
         </div>
@@ -4620,12 +4620,16 @@ function parseTimelineCSV(text){
   const firstCols=parseLine(lines[0]);
   const firstCell=(firstCols[0]||'').toLowerCase();
   const startIdx=(firstCell==='date'||firstCell==='stream'||firstCell==='')?1:0;
-  const validStreams=new Set(['383','STONEHAVEN','MINISTRY','315','KYTHROS','REALESTATE','EOS','MULTIENTITY','JOBSMETRIX']);
+  // No whitelist — any stream value is accepted. Known streams (383,
+  // STONEHAVEN, MINISTRY, 315, KYTHROS, REALESTATE, EOS, MULTIENTITY,
+  // JOBSMETRIX) get a dedicated color; anything else falls back to a
+  // default style everywhere that already handles it (project name,
+  // pill class, calendar color) rather than being silently rejected.
   return lines.slice(startIdx).map(line=>{
     const cols=parseLine(line);
     const[date='',stream='',type='',timeline_id='',title='',owner='',priority='',window_start='',window_due='',phase='',calendar_item_raw='',dependencies_raw='',description='']=cols;
     const s=stream.toUpperCase().trim();
-    if(!title.trim()||!validStreams.has(s))return null;
+    if(!title.trim()||!s)return null;
     return{
       date:date.trim(),stream:s,type:type.toUpperCase().trim(),timeline_id:timeline_id.trim(),
       title:title.trim(),owner:owner.trim(),priority:normalizePriority(priority),
@@ -4641,7 +4645,7 @@ function parseTimelineCSV(text){
 function previewParsedRows(rows){
   pendingImportRows=rows;
   const panel=document.getElementById('importPreviewPanel');
-  if(!rows.length){panel.innerHTML='<div class="muted" style="padding:10px">No valid rows found. Ensure columns match the template and stream values are 383, STONEHAVEN, MINISTRY, 315, KYTHROS, REALESTATE, EOS, MULTIENTITY, or JOBSMETRIX.</div>';panel.style.display='block';return;}
+  if(!rows.length){panel.innerHTML='<div class="muted" style="padding:10px">No valid rows found. Ensure columns match the template and every row has a title.</div>';panel.style.display='block';return;}
   const streamCounts={};rows.forEach(r=>{streamCounts[r.stream]=(streamCounts[r.stream]||0)+1;});
   const calCount=rows.filter(r=>r.calendar_item).length;
   const milTypes=new Set(['MILESTONE','PHASE_MILESTONE','ROLE_BEGIN','PHASE_BEGINS']);
