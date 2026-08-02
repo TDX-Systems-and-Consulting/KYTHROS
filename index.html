@@ -235,7 +235,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.0 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.1 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -4246,14 +4246,6 @@ function isInTeachingWindow(now,phase){
     return mins>=(sh*60+sm)&&mins<(eh*60+em);
   });
 }
-function isSundayLockedOut(now){
-  const day=now.getDay();
-  const mins=now.getHours()*60+now.getMinutes();
-  if(day===6&&mins>=23*60+59)return true; // Saturday 11:59pm+
-  if(day===0)return true; // all Sunday
-  if(day===1&&mins<6*60)return true; // Monday before 6am
-  return false;
-}
 function renderCalendarRoutingBanner(){
   const now=new Date();
   const phase=getActiveTeachingPhase(now);
@@ -4274,19 +4266,6 @@ function renderCalendarRoutingBanner(){
   }else{
     banner.style.display='none';
   }
-  checkSundayLockout(now);
-}
-function checkSundayLockout(now){
-  const locked=isSundayLockedOut(now);
-  let overlay=document.getElementById('sundayLockoutOverlay');
-  if(!overlay){
-    overlay=document.createElement('div');
-    overlay.id='sundayLockoutOverlay';
-    overlay.style.cssText='display:none;position:fixed;inset:0;z-index:9999;background:rgba(10,14,22,.96);align-items:center;justify-content:center;flex-direction:column;color:#fff;text-align:center;padding:30px';
-    overlay.innerHTML='<div style="font-size:2rem;margin-bottom:12px">🌙</div><div style="font-size:1.2rem;font-weight:800;margin-bottom:8px">Off the clock.</div><div style="max-width:360px;color:rgba(255,255,255,.7);margin-bottom:20px">Backend access locks Saturday 11:59pm through Monday 6:00am. Log off and rest — this reopens automatically Monday morning.</div><button class="btn" onclick="document.getElementById(\'sundayLockoutOverlay\').style.display=\'none\'" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25)">Dismiss for now</button>';
-    document.body.appendChild(overlay);
-  }
-  overlay.style.display=locked?'flex':'none';
 }
 function initCalendarRoutingEngine(){
   renderCalendarRoutingBanner();
