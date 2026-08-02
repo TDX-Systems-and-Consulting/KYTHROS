@@ -241,7 +241,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.4 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.5 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -6130,8 +6130,17 @@ function workNav(page, btn) {
   currentWorkPage = page;
   document.querySelectorAll('.work-nav').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  const renders = { wToday: renderWToday, wMatrix: renderWMatrix, wPriorities: renderWPriorities, wKanban: renderWKanban };
-  if (renders[page]) renders[page]();
+  wRenderCurrentPage();
+}
+
+// Renders whichever Work page is currently active. Used both by
+// workNav (switching tabs) and by any action that edits workState
+// data and needs the visible page to reflect it immediately —
+// deleting a blocker or pulse metric from the Today page, for
+// instance, shouldn't require also being on the Priorities page.
+const WORK_PAGE_RENDERS = { wToday: renderWToday, wMatrix: renderWMatrix, wPriorities: renderWPriorities, wKanban: renderWKanban };
+function wRenderCurrentPage() {
+  (WORK_PAGE_RENDERS[currentWorkPage] || renderWToday)();
 }
 
 function wEsc(str) {
@@ -6196,18 +6205,19 @@ function renderWToday() {
 
     <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:16px">
       <div class="w-card">
-        <div class="w-card-head"><div><div class="w-card-title">Weekly Pulse</div><div class="w-card-sub">Week of ${d.toLocaleDateString('en-US',{month:'long',day:'numeric'})}</div></div><button class="w-btn" style="font-size:11px" onclick="workNav('wPriorities',document.querySelector('.work-nav[data-wpage=wPriorities]'))">View all</button></div>
-        ${workState.pulse.map(p => `
+        <div class="w-card-head"><div><div class="w-card-title">Weekly Pulse</div><div class="w-card-sub">Week of ${d.toLocaleDateString('en-US',{month:'long',day:'numeric'})}</div></div><div style="display:flex;gap:6px"><button class="w-btn" style="font-size:11px" onclick="wAddPulse()">＋ Add</button><button class="w-btn" style="font-size:11px" onclick="workNav('wPriorities',document.querySelector('.work-nav[data-wpage=wPriorities]'))">View all</button></div></div>
+        ${workState.pulse.map((p,i) => `
           <div class="w-pulse-row">
             <span style="font-size:11px;color:rgba(110,145,210,.6);flex:1">${p.label}</span>
             <span style="font-size:14px;font-weight:800">${p.value}</span>
             <span style="font-size:10px;color:rgba(110,145,210,.4)">/ ${p.target}</span>
             <span class="${p.up?'w-trend-up':'w-trend-dn'}">${p.trend}</span>
+            <button onclick="wDeletePulse(${i})" title="Remove metric" style="background:none;border:none;color:rgba(110,145,210,.4);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1">×</button>
           </div>`).join('')}
       </div>
       <div class="w-card">
         <div class="w-card-head"><div><div class="w-card-title">Open Blockers</div><div class="w-card-sub">Move these forward today</div></div></div>
-        ${workState.blockers.map(b => `
+        ${workState.blockers.map((b,i) => `
           <div class="w-blocker" data-source="${b.source||'manual'}">
             <div style="width:3px;min-height:28px;border-radius:4px;background:${b.source==='jobsmetrix'?'#f59e0b':b.severity==='high'?'#ef4444':'#f59e0b'};flex-shrink:0"></div>
             <div style="flex:1">
@@ -6217,6 +6227,7 @@ function renderWToday() {
               </div>
               <div style="font-size:10px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(b.owner)} · ${wEsc(b.age)}</div>
             </div>
+            <button onclick="wResolveBlocker(${i})" title="Resolve / remove" style="background:none;border:none;color:#3b82f6;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0">Resolve</button>
           </div>`).join('')}
         ${!workState.blockers.length ? '<div style="font-size:12px;color:rgba(110,145,210,.4);font-style:italic;text-align:center;padding:12px">No open blockers.</div>' : ''}
       </div>
@@ -6295,12 +6306,13 @@ function renderWPriorities() {
         <button class="w-btn" style="margin-top:12px;width:100%;font-size:12px" onclick="wAddPriority()">＋ Add priority</button>
       </div>
       <div class="w-card">
-        <div class="w-card-head"><div><div class="w-card-title">Weekly Pulse</div><div class="w-card-sub">Confirm every Monday</div></div></div>
-        ${workState.pulse.map(p => `
+        <div class="w-card-head"><div><div class="w-card-title">Weekly Pulse</div><div class="w-card-sub">Confirm every Monday</div></div><button class="w-btn" onclick="wAddPulse()">＋ Add metric</button></div>
+        ${workState.pulse.map((p,i) => `
           <div class="w-pulse-row">
             <span style="font-size:11px;color:rgba(110,145,210,.6);flex:1">${p.label}</span>
             <span style="font-size:14px;font-weight:800">${p.value}</span>
             <span class="${p.up?'w-trend-up':'w-trend-dn'}">${p.trend}</span>
+            <button onclick="wDeletePulse(${i})" title="Remove metric" style="background:none;border:none;color:rgba(110,145,210,.4);cursor:pointer;font-size:14px;padding:0 0 0 6px;line-height:1">×</button>
           </div>`).join('')}
       </div>
     </div>
@@ -6454,8 +6466,28 @@ function wResolveBlocker(idx) {
   if (confirm('Mark blocker as resolved?')) {
     workState.blockers.splice(idx, 1);
     scheduleWorkSave();
-    renderWPriorities();
+    wRenderCurrentPage();
   }
+}
+
+function wDeletePulse(idx) {
+  if (confirm('Remove this metric?')) {
+    workState.pulse.splice(idx, 1);
+    scheduleWorkSave();
+    wRenderCurrentPage();
+  }
+}
+
+function wAddPulse() {
+  const label = prompt('Metric name (e.g. "Revenue collected"):');
+  if (!label?.trim()) return;
+  const value = prompt('Current value (e.g. "$84.2k"):') || '';
+  const target = prompt('Target (e.g. "$80k"):') || '';
+  const trend = prompt('Trend (e.g. "+8.4%"):') || '';
+  const up = !trend.trim().startsWith('-') && !trend.trim().startsWith('−');
+  workState.pulse.push({ label: label.trim(), value, target, trend, up });
+  scheduleWorkSave();
+  wRenderCurrentPage();
 }
 
 function wAddCard(col) {
@@ -6555,8 +6587,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // everything was deleted) data is now in memory. Re-render
         // whichever Work page is currently active to fix that.
         if (document.getElementById('workModePanel')?.style.display !== 'none') {
-          const renders = { wToday: renderWToday, wMatrix: renderWMatrix, wPriorities: renderWPriorities, wKanban: renderWKanban };
-          (renders[currentWorkPage] || renderWToday)();
+          wRenderCurrentPage();
         }
         pullJobsMetrixNotifications(user.uid);
       });
