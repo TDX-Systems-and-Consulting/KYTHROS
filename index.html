@@ -241,7 +241,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.8 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.8.9 · 02/Aug/2026</p></div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -6663,10 +6663,21 @@ function subscribeJobsMetrixPulse(uid) {
 
 function wRenderJmPulseRows() {
   if (!jmPulseSync) return '';
+  const trend = jmPulseSync.trend || {};
+  // Direction judgment differs per metric: more active jobs is neutral-
+  // ish, less outstanding money owed is good, fewer unprocessed COs is
+  // good. "up" here means "trending the right way", not just "bigger".
+  const fmtTrend = (delta, biggerIsBetter) => {
+    if (delta === null || delta === undefined) return '';
+    if (delta === 0) return '<span style="font-size:10px;color:rgba(110,145,210,.4)">— vs last wk</span>';
+    const good = biggerIsBetter ? delta > 0 : delta < 0;
+    const arrow = delta > 0 ? '↑' : '↓';
+    return `<span class="${good ? 'w-trend-up' : 'w-trend-dn'}" style="font-size:10px">${arrow} ${Math.abs(delta).toLocaleString()} vs last wk</span>`;
+  };
   const rows = [
-    { label: 'Active jobs', value: jmPulseSync.activeJobs },
-    { label: 'Outstanding invoices', value: jmPulseSync.outstandingInvoices != null ? '$' + jmPulseSync.outstandingInvoices.toLocaleString() : null },
-    { label: 'Unprocessed change orders', value: jmPulseSync.unprocessedCOs },
+    { label: 'Active jobs', value: jmPulseSync.activeJobs, trend: fmtTrend(trend.activeJobs, true) },
+    { label: 'Outstanding invoices', value: jmPulseSync.outstandingInvoices != null ? '$' + jmPulseSync.outstandingInvoices.toLocaleString() : null, trend: fmtTrend(trend.outstandingInvoices, false) },
+    { label: 'Unprocessed change orders', value: jmPulseSync.unprocessedCOs, trend: fmtTrend(trend.unprocessedCOs, false) },
   ].filter(r => r.value !== null && r.value !== undefined);
   if (!rows.length) return '';
   return rows.map(r => `
@@ -6674,6 +6685,7 @@ function wRenderJmPulseRows() {
       <span style="font-size:9px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 5px;border-radius:5px;margin-right:6px">JM</span>
       <span style="font-size:11px;color:rgba(110,145,210,.6);flex:1">${wEsc(r.label)}</span>
       <span style="font-size:14px;font-weight:800">${wEsc(String(r.value))}</span>
+      ${r.trend}
     </div>`).join('');
 }
 
