@@ -10,18 +10,82 @@
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <script>
+    // Applied here, before <style> and before body renders, so the page
+    // never flashes the default Blue theme for a frame before switching
+    // to a saved Black/Light preference. Per-browser preference
+    // (localStorage), not synced across devices — same approach as
+    // JOBSMETRIX's theme toggle.
+    (function() {
+      try {
+        const saved = localStorage.getItem('pxd_theme');
+        if (saved === 'light' || saved === 'black') document.documentElement.setAttribute('data-theme', saved);
+      } catch (e) {}
+    })();
+  </script>
   <style>
     :root{
       --bg:#05101d;--bg2:#0a1830;--panel:rgba(10,22,45,.92);--panel2:rgba(14,29,58,.94);--line:rgba(110,145,210,.20);
       --text:#eaf0fb;--muted:#98a7c4;--blue:#4d8dff;--blue2:#2b67ff;--green:#1dbb87;--red:#ef5350;--yellow:#f3b33d;
-      --purple:#a855f7;--radius:18px;--shadow:0 18px 42px rgba(0,0,0,.32)
+      --purple:#a855f7;--radius:18px;--shadow:0 18px 42px rgba(0,0,0,.32);
+      /* Aliases so the Work tab CSS (added separately, uses JOBSMETRIX-
+         style token names) resolves to real values instead of an
+         undefined var — --surface/--amber were referenced there but
+         never actually defined anywhere in :root until now. */
+      --surface:var(--panel);--surface2:var(--panel2);
+      --amber:#f59e0b;--amber2:#d97706;--amber-dim:rgba(245,158,11,.15);--amber-border:rgba(245,158,11,.3);
+      /* Full background values as single variables, since the actual
+         rules below use gradients/radial-gradients rather than a flat
+         color — can't reassemble a gradient function from separate
+         color variables, so the whole value is themed as one unit. */
+      --page-bg:radial-gradient(circle at top,#0a2146 0%,#071426 36%,#040b14 100%);
+      --card-bg:linear-gradient(180deg, rgba(12,26,50,.95), rgba(7,17,33,.95));
     }
+    /* Black theme: mirrors JOBSMETRIX's — mostly darker/neutral
+       backgrounds. The dominant hardcoded light text colors already
+       read fine on black, so this needs no extra text-color overrides
+       beyond the variables below. */
+    html[data-theme="black"] {
+      --bg:#000000;--bg2:#0a0a0a;--panel:rgba(14,14,14,.96);--panel2:rgba(20,20,20,.95);--line:rgba(150,150,150,.14);
+      --text:#f2f2f2;--muted:#8a8a8a;
+      --surface:var(--panel);--surface2:var(--panel2);
+      --page-bg:#000000;
+      --card-bg:linear-gradient(180deg, rgba(16,16,16,.96), rgba(8,8,8,.96));
+      --shadow:0 18px 42px rgba(0,0,0,.6);
+    }
+    /* Light theme: the direction that genuinely needs help, since a
+       light background makes the hardcoded near-white/pastel text
+       colors baked directly into JS-generated HTML throughout the app
+       invisible unless overridden. Handled below via attribute-selector
+       overrides on the exact hardcoded hex values in use — same
+       technique as JOBSMETRIX. This covers the highest-frequency
+       offenders found in the codebase; less common ones may still slip
+       through and can be added the same way as they surface. */
+    html[data-theme="light"] {
+      --bg:#f5f6f8;--bg2:#eef1f5;--panel:rgba(255,255,255,.98);--panel2:rgba(247,248,250,.98);--line:rgba(30,41,59,.14);
+      --text:#1a2233;--muted:#64748b;
+      --surface:var(--panel);--surface2:var(--panel2);
+      --page-bg:#f5f6f8;
+      --card-bg:linear-gradient(180deg,#ffffff,#f7f8fa);
+      --amber-dim:rgba(245,158,11,.10);--amber-border:rgba(245,158,11,.32);
+      --shadow:0 4px 18px rgba(15,23,42,.10);
+    }
+    html[data-theme="light"] [style*="#ffe09d"] { color: #92400e !important; }
+    html[data-theme="light"] [style*="#a3f2d2"] { color: #047857 !important; }
+    html[data-theme="light"] [style*="#ffc0be"] { color: #b91c1c !important; }
+    html[data-theme="light"] [style*="#bfd6ff"] { color: #1d4ed8 !important; }
+    html[data-theme="light"] [style*="#d4b0ff"] { color: #7c3aed !important; }
+    html[data-theme="light"] [style*="#ffb5b3"] { color: #b91c1c !important; }
+    html[data-theme="light"] [style*="#ffb3b8"] { color: #b91c1c !important; }
+    html[data-theme="light"] [style*="#fed7aa"] { color: #c2410c !important; }
+    html[data-theme="light"] [style*="#fbcfe8"] { color: #be185d !important; }
+    html[data-theme="light"] [style*="#e0bbff"] { color: #7c3aed !important; }
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html,body{margin:0;padding:0;touch-action:manipulation;background:radial-gradient(circle at top,#0a2146 0%,#071426 36%,#040b14 100%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    html,body{margin:0;padding:0;touch-action:manipulation;background:var(--page-bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     body{min-height:100vh}
     button,input,select,textarea{font:inherit;touch-action:manipulation}
     .app{max-width:1540px;margin:0 auto;padding:20px}
-    .topbar,.tabs,.card{background:linear-gradient(180deg, rgba(12,26,50,.95), rgba(7,17,33,.95));border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
+    .topbar,.tabs,.card{background:var(--card-bg);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
     .topbar{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:18px 22px;margin-bottom:16px}
     .brand h1{margin:0;font-size:2rem;line-height:1.05}.brand p{margin:8px 0 0;color:var(--muted)}
     .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.btn{border:1px solid var(--line);background:rgba(17,34,65,.95);color:var(--text);padding:11px 15px;border-radius:14px;cursor:pointer;font-size:1rem;height:46px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.btn:active{opacity:.8}
@@ -112,27 +176,27 @@
     /* ── Display Mode (Skylight) ── */
     .display-overlay{display:none;position:fixed;inset:0;z-index:99999;background:#050e1c;flex-direction:column;overflow:hidden;touch-action:manipulation}
     .display-overlay.active{display:flex}
-    .display-time{font-size:min(18vw,160px);font-weight:900;letter-spacing:-.04em;line-height:1;color:#eaf0fb;text-align:center;text-shadow:0 0 80px rgba(77,141,255,.3)}
-    .display-date{font-size:min(4vw,36px);color:#98a7c4;text-align:center;margin-top:8px;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+    .display-time{font-size:min(18vw,160px);font-weight:900;letter-spacing:-.04em;line-height:1;color:var(--text);text-align:center;text-shadow:0 0 80px rgba(77,141,255,.3)}
+    .display-date{font-size:min(4vw,36px);color:var(--muted);text-align:center;margin-top:8px;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
     .display-members-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin:0 24px;flex:1;align-items:flex-start;padding-top:4px;overflow:hidden}
     .display-member-col{flex:1;min-width:140px;max-width:280px;background:rgba(10,22,45,.7);border-radius:18px;padding:14px;border-top:4px solid var(--mc)}
     .display-member-name{font-weight:800;font-size:1rem;margin-bottom:10px;color:#fff}
-    .display-ev{padding:8px 10px;border-radius:10px;margin-bottom:7px;font-size:.85rem;background:rgba(255,255,255,.07);color:#eaf0fb}
-    .display-ev-time{font-size:.72rem;color:#98a7c4;margin-top:2px}
+    .display-ev{padding:8px 10px;border-radius:10px;margin-bottom:7px;font-size:.85rem;background:rgba(255,255,255,.07);color:var(--text)}
+    .display-ev-time{font-size:.72rem;color:var(--muted);margin-top:2px}
     .display-tap-hint{text-align:center;padding:14px;font-size:.82rem;color:rgba(255,255,255,.2);letter-spacing:.08em;text-transform:uppercase}
     .display-upcoming{display:flex;gap:10px;overflow-x:auto;padding:0 24px 16px;scrollbar-width:none}
     .display-upcoming::-webkit-scrollbar{display:none}
     .display-upcoming-day{background:rgba(10,22,45,.7);border-radius:14px;padding:12px 14px;min-width:130px;flex-shrink:0}
-    .display-upcoming-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:#98a7c4;margin-bottom:6px;font-weight:700}
+    .display-upcoming-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px;font-weight:700}
     .display-no-ev{color:rgba(255,255,255,.2);font-size:.82rem;font-style:italic}
     @media(max-width:700px){.family-week-grid{grid-template-columns:44px repeat(7,minmax(0,1fr))}.display-time{font-size:22vw}.display-members-row{gap:8px}.display-member-col{min-width:110px;padding:10px}}
     /* ── Dashboard ── */
     .dash-hero{background:linear-gradient(135deg,rgba(12,26,58,.97) 0%,rgba(7,17,38,.97) 100%);border:1px solid rgba(110,145,210,.18);border-radius:22px;padding:28px 32px;margin-bottom:16px;position:relative;overflow:hidden}
     .dash-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(77,141,255,.08) 0%,transparent 70%);pointer-events:none}
-    .dash-time{font-size:clamp(2.8rem,7vw,5.5rem);font-weight:900;letter-spacing:-.04em;line-height:1;color:#eaf0fb;text-shadow:0 0 60px rgba(77,141,255,.2)}
-    .dash-date-label{font-size:clamp(.9rem,2vw,1.15rem);color:#98a7c4;font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-top:6px}
-    .dash-greeting{font-size:clamp(1rem,2.2vw,1.3rem);font-weight:700;color:#eaf0fb;margin-top:10px}
-    .dash-summary{font-size:.9rem;color:#98a7c4;margin-top:5px;line-height:1.5}
+    .dash-time{font-size:clamp(2.8rem,7vw,5.5rem);font-weight:900;letter-spacing:-.04em;line-height:1;color:var(--text);text-shadow:0 0 60px rgba(77,141,255,.2)}
+    .dash-date-label{font-size:clamp(.9rem,2vw,1.15rem);color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-top:6px}
+    .dash-greeting{font-size:clamp(1rem,2.2vw,1.3rem);font-weight:700;color:var(--text);margin-top:10px}
+    .dash-summary{font-size:.9rem;color:var(--muted);margin-top:5px;line-height:1.5}
     .dash-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
     .dash-stat{background:linear-gradient(180deg,rgba(12,26,50,.95),rgba(7,17,33,.95));border:1px solid rgba(110,145,210,.16);border-radius:16px;padding:16px 18px;position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s;cursor:pointer}
     .dash-stat:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);border-color:rgba(110,145,210,.35)}
@@ -146,15 +210,15 @@
     .dash-section-body{padding:12px 14px;display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto}
     .dash-task{border-radius:12px;padding:11px 13px;border-left:3px solid transparent;background:rgba(255,255,255,.03);cursor:pointer;transition:background .12s}
     .dash-task:hover{background:rgba(255,255,255,.06)}
-    .dash-task-title{font-size:.88rem;font-weight:600;color:#eaf0fb;line-height:1.3}
+    .dash-task-title{font-size:.88rem;font-weight:600;color:var(--text);line-height:1.3}
     .dash-task-meta{font-size:.75rem;color:var(--muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .dash-event{border-radius:12px;padding:11px 13px;background:rgba(255,255,255,.03);border-left:3px solid rgba(77,141,255,.5)}
-    .dash-event-title{font-size:.88rem;font-weight:600;color:#eaf0fb}
+    .dash-event-title{font-size:.88rem;font-weight:600;color:var(--text)}
     .dash-event-time{font-size:.75rem;color:var(--muted);margin-top:3px}
     .dash-meal-slot{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(110,145,210,.08)}
     .dash-meal-slot:last-child{border-bottom:none}
     .dash-meal-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;width:68px;flex-shrink:0}
-    .dash-meal-name{font-size:.85rem;color:#eaf0fb;font-weight:500}
+    .dash-meal-name{font-size:.85rem;color:var(--text);font-weight:500}
     .dash-empty{color:var(--muted);font-size:.84rem;font-style:italic;padding:12px 0}
     .dash-overdue-badge{background:rgba(239,83,80,.15);border:1px solid rgba(239,83,80,.3);color:#ffb5b3;border-radius:8px;padding:2px 7px;font-size:.7rem;font-weight:700}
     .dash-today-badge{background:rgba(243,179,61,.15);border:1px solid rgba(243,179,61,.3);color:#ffe09d;border-radius:8px;padding:2px 7px;font-size:.7rem;font-weight:700}
@@ -186,7 +250,7 @@
     .kythy-msg.assistant{align-self:flex-start;align-items:flex-start}
     .kythy-bubble{padding:12px 16px;border-radius:16px;font-size:.9rem;line-height:1.55;white-space:pre-wrap;word-break:break-word}
     .kythy-msg.user .kythy-bubble{background:linear-gradient(135deg,#4d8dff,#3a6fd4);color:#fff;border-bottom-right-radius:4px}
-    .kythy-msg.assistant .kythy-bubble{background:rgba(255,255,255,.05);border:1px solid rgba(110,145,210,.15);color:#eaf0fb;border-bottom-left-radius:4px}
+    .kythy-msg.assistant .kythy-bubble{background:rgba(255,255,255,.05);border:1px solid rgba(110,145,210,.15);color:var(--text);border-bottom-left-radius:4px}
     .kythy-msg-label{font-size:.7rem;color:rgba(110,145,210,.5);padding:0 4px}
     .kythy-typing{display:flex;gap:5px;align-items:center;padding:14px 16px}
     .kythy-typing span{width:7px;height:7px;border-radius:50%;background:rgba(110,145,210,.5);animation:kythyDot 1.2s infinite}
@@ -194,7 +258,7 @@
     .kythy-typing span:nth-child(3){animation-delay:.4s}
     @keyframes kythyDot{0%,80%,100%{transform:scale(.8);opacity:.4}40%{transform:scale(1.1);opacity:1}}
     .kythy-input-row{padding:14px 18px;border-top:1px solid rgba(110,145,210,.12);display:flex;gap:10px;flex-shrink:0;background:rgba(7,17,33,.8)}
-    .kythy-input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:11px 16px;color:#eaf0fb;font-size:.9rem;resize:none;min-height:44px;max-height:120px;font-family:inherit;line-height:1.4}
+    .kythy-input{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:11px 16px;color:var(--text);font-size:.9rem;resize:none;min-height:44px;max-height:120px;font-family:inherit;line-height:1.4}
     .kythy-input:focus{outline:none;border-color:rgba(77,141,255,.5);background:rgba(77,141,255,.06)}
     .kythy-send{background:linear-gradient(135deg,#4d8dff,#3a6fd4);border:none;border-radius:12px;color:#fff;font-size:1.2rem;width:46px;height:46px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}
     .kythy-send:hover{opacity:.85}
@@ -210,7 +274,7 @@
     input[type="time"]::-webkit-calendar-picker-indicator:hover,
     input[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
     .pac-container{background:#0d1f3c!important;border:1px solid rgba(110,145,210,.25)!important;border-radius:12px!important;box-shadow:0 12px 32px rgba(0,0,0,.5)!important;margin-top:4px!important;overflow:hidden!important;z-index:99999!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif!important}
-    .pac-item{padding:10px 14px!important;color:#eaf0fb!important;font-size:.88rem!important;cursor:pointer!important;border-top:1px solid rgba(110,145,210,.1)!important;line-height:1.4!important}
+    .pac-item{padding:10px 14px!important;color:var(--text)!important;font-size:.88rem!important;cursor:pointer!important;border-top:1px solid rgba(110,145,210,.1)!important;line-height:1.4!important}
     .pac-item:first-child{border-top:none!important}
     .pac-item:hover,.pac-item-selected{background:rgba(77,141,255,.15)!important}
     .pac-item-query{color:#bfd6ff!important;font-weight:600!important;font-size:.9rem!important}
@@ -241,7 +305,13 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.9.1 · 02/Aug/2026</p></div>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.0 · 02/Aug/2026</p>
+      <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
+        <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
+        <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
+        <button onclick="setTheme('light')" title="Light" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#f5f6f8;cursor:pointer"></button>
+      </div>
+    </div>
     <div class="actions">
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
@@ -492,7 +562,7 @@
     <!-- Stream picker -->
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <label style="font-weight:700;font-size:.9rem;color:var(--muted)">Project:</label>
-      <select id="projectBudgetStream" onchange="renderProjectBudget()" style="font-size:.95rem;padding:9px 14px;border-radius:10px;background:rgba(8,19,37,.9);border:1px solid rgba(110,145,210,.25);color:#eaf0fb;font-weight:600">
+      <select id="projectBudgetStream" onchange="renderProjectBudget()" style="font-size:.95rem;padding:9px 14px;border-radius:10px;background:rgba(8,19,37,.9);border:1px solid rgba(110,145,210,.25);color:var(--text);font-weight:600">
         <option value="383">383 — Men's Conference</option>
         <option value="STONEHAVEN">STONEHAVEN — Church Plant</option>
         <option value="MINISTRY">MINISTRY — Content</option>
@@ -967,33 +1037,33 @@ function showAuthScreen() {
   if (!el) {
     el = document.createElement('div');
     el.id = 'plannerxdAuthScreen';
-    el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:radial-gradient(circle at top,#0a2146 0%,#071426 36%,#040b14 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:var(--page-bg);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px';
     el.innerHTML = `
       <div style="width:100%;max-width:400px;text-align:center">
-        <div style="font-size:2.5rem;font-weight:900;letter-spacing:-.04em;color:#eaf0fb;margin-bottom:4px">PlannerXD</div>
-        <div style="color:#98a7c4;font-size:.95rem;margin-bottom:36px">Your personal life operating system</div>
+        <div style="font-size:2.5rem;font-weight:900;letter-spacing:-.04em;color:var(--text);margin-bottom:4px">PlannerXD</div>
+        <div style="color:var(--muted);font-size:.95rem;margin-bottom:36px">Your personal life operating system</div>
         <div id="authError" style="display:none;background:rgba(239,83,80,.15);border:1px solid rgba(239,83,80,.3);border-radius:12px;padding:10px 14px;margin-bottom:16px;color:#ffc0be;font-size:.88rem"></div>
         <div id="authFormWrap" style="background:rgba(10,22,45,.92);border:1px solid rgba(110,145,210,.2);border-radius:22px;padding:28px;text-align:left">
           <div id="authModeTabs" style="display:flex;gap:0;border-radius:10px;overflow:hidden;border:1px solid rgba(110,145,210,.2);margin-bottom:20px">
             <button id="authTabSignIn" onclick="setAuthMode('signin')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:700;font-size:.88rem;background:linear-gradient(135deg,#4d8dff,#3a6fd4);color:#fff">Sign In</button>
-            <button id="authTabSignUp" onclick="setAuthMode('signup')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:700;font-size:.88rem;background:rgba(8,19,37,.8);color:#98a7c4">Create Account</button>
+            <button id="authTabSignUp" onclick="setAuthMode('signup')" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:700;font-size:.88rem;background:rgba(8,19,37,.8);color:var(--muted)">Create Account</button>
           </div>
           <div id="authNameWrap" style="display:none;margin-bottom:12px">
-            <label style="font-size:.82rem;color:#98a7c4;font-weight:600;display:block;margin-bottom:4px">Your Name</label>
-            <input id="authName" placeholder="First name" style="width:100%;background:rgba(7,17,33,.94);color:#eaf0fb;border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:12px 13px;outline:none;box-sizing:border-box" />
+            <label style="font-size:.82rem;color:var(--muted);font-weight:600;display:block;margin-bottom:4px">Your Name</label>
+            <input id="authName" placeholder="First name" style="width:100%;background:rgba(7,17,33,.94);color:var(--text);border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:12px 13px;outline:none;box-sizing:border-box" />
           </div>
           <div style="margin-bottom:12px">
-            <label style="font-size:.82rem;color:#98a7c4;font-weight:600;display:block;margin-bottom:4px">Email</label>
-            <input id="authEmail" type="email" placeholder="you@email.com" style="width:100%;background:rgba(7,17,33,.94);color:#eaf0fb;border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:12px 13px;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')submitAuth()" />
+            <label style="font-size:.82rem;color:var(--muted);font-weight:600;display:block;margin-bottom:4px">Email</label>
+            <input id="authEmail" type="email" placeholder="you@email.com" style="width:100%;background:rgba(7,17,33,.94);color:var(--text);border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:12px 13px;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')submitAuth()" />
           </div>
           <div style="margin-bottom:20px">
-            <label style="font-size:.82rem;color:#98a7c4;font-weight:600;display:block;margin-bottom:4px">Password</label>
-            <input id="authPassword" type="password" placeholder="••••••••" style="width:100%;background:rgba(7,17,33,.94);color:#eaf0fb;border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:12px 13px;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')submitAuth()" />
+            <label style="font-size:.82rem;color:var(--muted);font-weight:600;display:block;margin-bottom:4px">Password</label>
+            <input id="authPassword" type="password" placeholder="••••••••" style="width:100%;background:rgba(7,17,33,.94);color:var(--text);border:1px solid rgba(110,145,210,.2);border-radius:14px;padding:12px 13px;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')submitAuth()" />
           </div>
           <button onclick="submitAuth()" id="authSubmitBtn" style="width:100%;background:linear-gradient(180deg,#4d8dff,#2b67ff);border:none;border-radius:14px;color:#fff;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;margin-bottom:14px">Sign In</button>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><div style="flex:1;height:1px;background:rgba(110,145,210,.2)"></div><span style="font-size:.78rem;color:#98a7c4">or</span><div style="flex:1;height:1px;background:rgba(110,145,210,.2)"></div></div>
-          <button onclick="signInWithGoogle()" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(110,145,210,.2);border-radius:14px;color:#eaf0fb;padding:13px;font-size:.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px"><svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>Continue with Google</button>
-          <div id="authForgotWrap" style="text-align:center;margin-top:14px"><button onclick="forgotPassword()" style="background:none;border:none;color:#98a7c4;font-size:.82rem;cursor:pointer;text-decoration:underline">Forgot password?</button></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><div style="flex:1;height:1px;background:rgba(110,145,210,.2)"></div><span style="font-size:.78rem;color:var(--muted)">or</span><div style="flex:1;height:1px;background:rgba(110,145,210,.2)"></div></div>
+          <button onclick="signInWithGoogle()" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(110,145,210,.2);border-radius:14px;color:var(--text);padding:13px;font-size:.92rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px"><svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>Continue with Google</button>
+          <div id="authForgotWrap" style="text-align:center;margin-top:14px"><button onclick="forgotPassword()" style="background:none;border:none;color:var(--muted);font-size:.82rem;cursor:pointer;text-decoration:underline">Forgot password?</button></div>
         </div>
         <div style="margin-top:20px;font-size:.78rem;color:rgba(110,145,210,.4)">PlannerXD · $9.99/mo or $49.99 lifetime</div>
       </div>
@@ -1011,7 +1081,38 @@ function hideAuthScreen() {
   const gate = document.getElementById('loginGate');
   if (gate) gate.style.display = 'none';
   document.body.style.overflow = '';
+  highlightActiveThemeSwatch();
 }
+
+// ── Theme toggle (Blue default / Black / Light) ──
+// Per-browser preference via localStorage, applied instantly on click
+// (no reload needed) and re-applied before paint on every future load
+// via the inline script at the top of index.html. Mirrors JOBSMETRIX's
+// implementation exactly, just with a distinct localStorage key.
+function setTheme(theme) {
+  if (theme === 'blue') {
+    document.documentElement.removeAttribute('data-theme');
+    try { localStorage.removeItem('pxd_theme'); } catch (e) {}
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('pxd_theme', theme); } catch (e) {}
+  }
+  highlightActiveThemeSwatch();
+}
+window.setTheme = setTheme;
+
+function highlightActiveThemeSwatch() {
+  const current = document.documentElement.getAttribute('data-theme') || 'blue';
+  const wrap = document.getElementById('themeToggle');
+  if (!wrap) return;
+  const buttons = wrap.querySelectorAll('button');
+  const order = ['blue', 'black', 'light'];
+  buttons.forEach((btn, i) => {
+    btn.style.borderColor = order[i] === current ? 'var(--blue)' : 'var(--line)';
+    btn.style.boxShadow = order[i] === current ? '0 0 0 2px rgba(77,141,255,.3)' : 'none';
+  });
+}
+window.highlightActiveThemeSwatch = highlightActiveThemeSwatch;
 
 let _authMode = 'signin';
 function setAuthMode(mode) {
@@ -1138,24 +1239,24 @@ function showPaywall() {
   if (!el) {
     el = document.createElement('div');
     el.id = 'plannerxdPaywall';
-    el.style.cssText = 'position:fixed;inset:0;z-index:99998;background:radial-gradient(circle at top,#0a2146 0%,#071426 36%,#040b14 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px;overflow-y:auto';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99998;background:var(--page-bg);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px;overflow-y:auto';
     el.innerHTML = `
       <div style="width:100%;max-width:560px;text-align:center">
-        <div style="font-size:2.5rem;font-weight:900;letter-spacing:-.04em;color:#eaf0fb;margin-bottom:4px">PlannerXD</div>
-        <div style="color:#98a7c4;font-size:.95rem;margin-bottom:8px">Your personal life operating system</div>
+        <div style="font-size:2.5rem;font-weight:900;letter-spacing:-.04em;color:var(--text);margin-bottom:4px">PlannerXD</div>
+        <div style="color:var(--muted);font-size:.95rem;margin-bottom:8px">Your personal life operating system</div>
         <div style="color:#4d8dff;font-size:.82rem;margin-bottom:32px">Choose a plan to get started</div>
         
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
           <!-- Monthly -->
           <div style="background:rgba(10,22,45,.92);border:1px solid rgba(110,145,210,.2);border-radius:22px;padding:28px 20px;text-align:center">
-            <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:#98a7c4;font-weight:700;margin-bottom:12px">Monthly</div>
-            <div style="font-size:2.8rem;font-weight:900;color:#eaf0fb;line-height:1">$9.99</div>
-            <div style="color:#98a7c4;font-size:.82rem;margin-bottom:20px">per month</div>
+            <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700;margin-bottom:12px">Monthly</div>
+            <div style="font-size:2.8rem;font-weight:900;color:var(--text);line-height:1">$9.99</div>
+            <div style="color:var(--muted);font-size:.82rem;margin-bottom:20px">per month</div>
             <ul style="text-align:left;list-style:none;padding:0;margin:0 0 24px;display:flex;flex-direction:column;gap:8px">
-              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Full PlannerXD workspace</li>
-              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Google Calendar sync</li>
-              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> KYTHY AI assistant</li>
-              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Cancel anytime</li>
+              <li style="font-size:.85rem;color:var(--muted);display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Full PlannerXD workspace</li>
+              <li style="font-size:.85rem;color:var(--muted);display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Google Calendar sync</li>
+              <li style="font-size:.85rem;color:var(--muted);display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> KYTHY AI assistant</li>
+              <li style="font-size:.85rem;color:var(--muted);display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Cancel anytime</li>
             </ul>
             <button onclick="startCheckout('monthly')" style="width:100%;background:linear-gradient(180deg,#4d8dff,#2b67ff);border:none;border-radius:14px;color:#fff;padding:14px;font-size:.95rem;font-weight:700;cursor:pointer">Get Monthly</button>
           </div>
@@ -1164,13 +1265,13 @@ function showPaywall() {
           <div style="background:rgba(10,22,45,.92);border:2px solid rgba(243,179,61,.4);border-radius:22px;padding:28px 20px;text-align:center;position:relative">
             <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#f3b33d,#e09020);border-radius:999px;padding:4px 16px;font-size:.72rem;font-weight:800;color:#000;white-space:nowrap">BEST VALUE</div>
             <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:#f3b33d;font-weight:700;margin-bottom:12px">Lifetime</div>
-            <div style="font-size:2.8rem;font-weight:900;color:#eaf0fb;line-height:1">$99.99</div>
-            <div style="color:#98a7c4;font-size:.82rem;margin-bottom:20px">one-time payment</div>
+            <div style="font-size:2.8rem;font-weight:900;color:var(--text);line-height:1">$99.99</div>
+            <div style="color:var(--muted);font-size:.82rem;margin-bottom:20px">one-time payment</div>
             <ul style="text-align:left;list-style:none;padding:0;margin:0 0 24px;display:flex;flex-direction:column;gap:8px">
-              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Everything in Monthly</li>
-              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Never pay again</li>
-              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> All future updates</li>
-              <li style="font-size:.85rem;color:#98a7c4;display:flex;gap:8px;align-items:center"><span style="color:#f3b33d">★</span> Priority support</li>
+              <li style="font-size:.85rem;color:var(--muted);display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Everything in Monthly</li>
+              <li style="font-size:.85rem;color:var(--muted);display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> Never pay again</li>
+              <li style="font-size:.85rem;color:var(--muted);display:flex;gap:8px;align-items:center"><span style="color:#1dbb87">✓</span> All future updates</li>
+              <li style="font-size:.85rem;color:var(--muted);display:flex;gap:8px;align-items:center"><span style="color:#f3b33d">★</span> Priority support</li>
             </ul>
             <button onclick="startCheckout('lifetime')" style="width:100%;background:linear-gradient(135deg,#f3b33d,#e09020);border:none;border-radius:14px;color:#000;padding:14px;font-size:.95rem;font-weight:800;cursor:pointer">Get Lifetime Access</button>
           </div>
@@ -1949,7 +2050,7 @@ function renderEisenhower(){
     <div class="card" style="background:rgba(239,83,80,.06);border:1px solid rgba(239,83,80,.25)"><div class="card-body"><h3 style="margin:0 0 4px;color:#ef5350">🔥 Do First</h3><p class="muted" style="font-size:.78rem;margin:0 0 10px">Urgent &amp; Important</p>${quads.q1.map(card).join('')||'<div class="muted" style="font-size:.8rem">Nothing here.</div>'}</div></div>
     <div class="card" style="background:rgba(29,187,135,.06);border:1px solid rgba(29,187,135,.25)"><div class="card-body"><h3 style="margin:0 0 4px;color:#1dbb87">🎯 Schedule</h3><p class="muted" style="font-size:.78rem;margin:0 0 10px">Important, Not Urgent</p>${quads.q2.map(card).join('')||'<div class="muted" style="font-size:.8rem">Nothing here.</div>'}</div></div>
     <div class="card" style="background:rgba(243,179,61,.06);border:1px solid rgba(243,179,61,.25)"><div class="card-body"><h3 style="margin:0 0 4px;color:#f3b33d">👥 Delegate</h3><p class="muted" style="font-size:.78rem;margin:0 0 10px">Urgent, Not Important</p>${quads.q3.map(card).join('')||'<div class="muted" style="font-size:.8rem">Nothing here.</div>'}</div></div>
-    <div class="card" style="background:rgba(152,167,196,.06);border:1px solid rgba(152,167,196,.2)"><div class="card-body"><h3 style="margin:0 0 4px;color:#98a7c4">🗑 Eliminate</h3><p class="muted" style="font-size:.78rem;margin:0 0 10px">Neither</p>${quads.q4.map(card).join('')||'<div class="muted" style="font-size:.8rem">Nothing here.</div>'}</div></div>
+    <div class="card" style="background:rgba(152,167,196,.06);border:1px solid rgba(152,167,196,.2)"><div class="card-body"><h3 style="margin:0 0 4px;color:var(--muted)">🗑 Eliminate</h3><p class="muted" style="font-size:.78rem;margin:0 0 10px">Neither</p>${quads.q4.map(card).join('')||'<div class="muted" style="font-size:.8rem">Nothing here.</div>'}</div></div>
   </div>`;
   targets.forEach(el=>el.innerHTML=boardHtml);
 }
@@ -2547,7 +2648,7 @@ function renderProjectBudgetLines(stream,pb,col){
     totalPlanned+=planned;totalActual+=actual;
     return`<div class="envelope-row" style="cursor:pointer" onclick="openProjectCategoryModal(null,${i})">
       <div style="display:flex;align-items:center;gap:8px">${esc(c.name)}<span style="font-size:.72rem;background:rgba(110,145,210,.1);border-radius:6px;padding:1px 6px;color:var(--muted)">${c.type==='income'?'Revenue':'Expense'}</span></div>
-      <div style="text-align:right"><input type="number" step="100" value="${planned||''}" placeholder="0" style="width:90px;text-align:right;padding:4px 8px;font-size:.88rem;background:rgba(8,19,37,.7);border:1px solid rgba(110,145,210,.2);border-radius:6px;color:#eaf0fb" onchange="updateProjectCategoryPlanned('${stream}',${i},this.value)" onclick="event.stopPropagation()" /></div>
+      <div style="text-align:right"><input type="number" step="100" value="${planned||''}" placeholder="0" style="width:90px;text-align:right;padding:4px 8px;font-size:.88rem;background:rgba(8,19,37,.7);border:1px solid rgba(110,145,210,.2);border-radius:6px;color:var(--text)" onchange="updateProjectCategoryPlanned('${stream}',${i},this.value)" onclick="event.stopPropagation()" /></div>
       <div style="text-align:right">${fmtMoney(actual)}</div>
       <div style="text-align:right;font-weight:700;color:${leftColor}">${over?'−$'+Math.abs(left).toFixed(2):exact?'—':fmtMoney(Math.abs(left))}</div>
     </div>`;
@@ -3361,9 +3462,9 @@ function showImportReview(bankName,filename,rows){
         <td><input type="checkbox" id="imp_${i}" ${isNew?'checked':''} onchange="updateImportCount()" style="width:16px;height:16px"/></td>
         <td>${r.date}</td>
         <td>${esc(r.desc)}${r.isDup?'<span style="font-size:.72rem;color:#f3b33d;margin-left:6px">possible duplicate</span>':''}</td>
-        <td><select style="font-size:.78rem;padding:3px 6px;background:rgba(8,19,37,.9);border:1px solid rgba(110,145,210,.2);border-radius:6px;color:#eaf0fb" onchange="_pendingImportRows[${i}].category=this.value">${getCategoryOptions(r.category)}</select></td>
+        <td><select style="font-size:.78rem;padding:3px 6px;background:rgba(8,19,37,.9);border:1px solid rgba(110,145,210,.2);border-radius:6px;color:var(--text)" onchange="_pendingImportRows[${i}].category=this.value">${getCategoryOptions(r.category)}</select></td>
         <td style="font-weight:600;color:${r.type==='income'?'#1dbb87':'#eaf0fb'}">${r.type==='income'?'+':'−'}${fmtMoney(r.amount)}</td>
-        <td><select style="font-size:.78rem;padding:3px 6px;background:rgba(8,19,37,.9);border:1px solid rgba(110,145,210,.2);border-radius:6px;color:#eaf0fb" onchange="_pendingImportRows[${i}].type=this.value"><option value="expense" ${r.type==='expense'?'selected':''}>Expense</option><option value="income" ${r.type==='income'?'selected':''}>Income</option></select></td>
+        <td><select style="font-size:.78rem;padding:3px 6px;background:rgba(8,19,37,.9);border:1px solid rgba(110,145,210,.2);border-radius:6px;color:var(--text)" onchange="_pendingImportRows[${i}].type=this.value"><option value="expense" ${r.type==='expense'?'selected':''}>Expense</option><option value="income" ${r.type==='income'?'selected':''}>Income</option></select></td>
       </tr>`;
     }).join('');
   }
@@ -5067,7 +5168,7 @@ function updateDisplayMode(){
     const dt=new Date(d+'T00:00:00');
     const evs=getFamilyEventsForDate(d);
     const label=dt.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
-    upHtml+=`<div class="display-upcoming-day"><div class="display-upcoming-label">${label}</div>${evs.length?evs.slice(0,3).map(e=>{const col=e.memberId?memberColor(e.memberId):'#4a5568';return`<div style="font-size:.78rem;color:#eaf0fb;border-left:3px solid ${col};padding-left:6px;margin-bottom:4px">${esc(e.title)}</div>`;}).join(''):
+    upHtml+=`<div class="display-upcoming-day"><div class="display-upcoming-label">${label}</div>${evs.length?evs.slice(0,3).map(e=>{const col=e.memberId?memberColor(e.memberId):'#4a5568';return`<div style="font-size:.78rem;color:var(--text);border-left:3px solid ${col};padding-left:6px;margin-bottom:4px">${esc(e.title)}</div>`;}).join(''):
     '<div class="display-no-ev" style="font-size:.78rem">Free</div>'}</div>`;
   }
   upEl.innerHTML=upHtml;
@@ -5150,7 +5251,7 @@ function renderResourcesView(){
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-direction:column">
-        ${isOut?`<button class="btn btn-green" style="font-size:.82rem" onclick="checkInResource('${r.id}')">Check In</button>`:`<select style="font-size:.82rem;padding:6px 10px;background:rgba(8,19,37,.9);border:1px solid rgba(110,145,210,.2);border-radius:8px;color:#eaf0fb" onchange="checkOutResource('${r.id}',this.value);this.value=''"><option value="">Check Out...</option>${members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('')}</select>`}
+        ${isOut?`<button class="btn btn-green" style="font-size:.82rem" onclick="checkInResource('${r.id}')">Check In</button>`:`<select style="font-size:.82rem;padding:6px 10px;background:rgba(8,19,37,.9);border:1px solid rgba(110,145,210,.2);border-radius:8px;color:var(--text)" onchange="checkOutResource('${r.id}',this.value);this.value=''"><option value="">Check Out...</option>${members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('')}</select>`}
         <button class="btn" style="font-size:.78rem;padding:5px 10px" onclick="openResourceModal('${r.id}')">Edit</button>
       </div>
     </div>`;
@@ -6002,7 +6103,7 @@ try{ initFirebase(); }catch(e){ console.error('Firebase init failed:',e); render
   color:rgba(110,145,210,.6);font-size:13px;font-weight:500;
   text-align:left;transition:all .12s;border:none;background:none;cursor:pointer;
 }
-.work-nav:hover { background:rgba(110,145,210,.07);color:#eaf0fb; }
+.work-nav:hover { background:rgba(110,145,210,.07);color:var(--text); }
 .work-nav.active {
   background:rgba(245,158,11,.1);color:var(--amber);font-weight:700;
   border:1px solid rgba(245,158,11,.15);
@@ -6014,7 +6115,7 @@ try{ initFirebase(); }catch(e){ console.error('Firebase init failed:',e); render
 .w-card-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:16px; }
 .w-card-title { font-size:14px;font-weight:700; }
 .w-card-sub { font-size:11px;color:rgba(110,145,210,.6);margin-top:2px; }
-.w-btn { padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid rgba(110,145,210,.2);color:#eaf0fb;background:none;cursor:pointer; }
+.w-btn { padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid rgba(110,145,210,.2);color:var(--text);background:none;cursor:pointer; }
 .w-btn:hover { border-color:var(--amber);color:var(--amber); }
 .w-btn-amber { background:linear-gradient(135deg,#f59e0b,#d97706);color:#060e1c;border:none;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer; }
 .w-task {
@@ -6574,23 +6675,23 @@ function wOpenCardModal(card, col) {
       <div style="display:flex;flex-direction:column;gap:14px">
         <div>
           <label style="font-size:11px;font-weight:700;color:rgba(110,145,210,.6);letter-spacing:.08em;display:block;margin-bottom:6px">TITLE</label>
-          <input id="wCardTitle" value="${isEdit ? wEsc(card.title) : ''}" placeholder="Card title" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(110,145,210,.2);border-radius:10px;padding:10px 14px;color:#eaf0fb;font-size:14px;box-sizing:border-box">
+          <input id="wCardTitle" value="${isEdit ? wEsc(card.title) : ''}" placeholder="Card title" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(110,145,210,.2);border-radius:10px;padding:10px 14px;color:var(--text);font-size:14px;box-sizing:border-box">
         </div>
         <div>
           <label style="font-size:11px;font-weight:700;color:rgba(110,145,210,.6);letter-spacing:.08em;display:block;margin-bottom:6px">TAG</label>
-          <select id="wCardTag" style="width:100%;background:rgba(13,26,48,.95);border:1px solid rgba(110,145,210,.2);border-radius:10px;padding:10px 14px;color:#eaf0fb;font-size:14px;box-sizing:border-box">
+          <select id="wCardTag" style="width:100%;background:rgba(13,26,48,.95);border:1px solid rgba(110,145,210,.2);border-radius:10px;padding:10px 14px;color:var(--text);font-size:14px;box-sizing:border-box">
             ${W_TAGS.map(t => `<option value="${t}" ${isEdit && card.tag===t ? 'selected' : ''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
           </select>
         </div>
         <div>
           <label style="font-size:11px;font-weight:700;color:rgba(110,145,210,.6);letter-spacing:.08em;display:block;margin-bottom:6px">COLUMN</label>
-          <select id="wCardCol" style="width:100%;background:rgba(13,26,48,.95);border:1px solid rgba(110,145,210,.2);border-radius:10px;padding:10px 14px;color:#eaf0fb;font-size:14px;box-sizing:border-box">
+          <select id="wCardCol" style="width:100%;background:rgba(13,26,48,.95);border:1px solid rgba(110,145,210,.2);border-radius:10px;padding:10px 14px;color:var(--text);font-size:14px;box-sizing:border-box">
             ${W_COLS.map(c => `<option value="${c}" ${c===col ? 'selected' : ''}>${c}</option>`).join('')}
           </select>
         </div>
         <div>
           <label style="font-size:11px;font-weight:700;color:rgba(110,145,210,.6);letter-spacing:.08em;display:block;margin-bottom:6px">OWNER</label>
-          <input id="wCardOwner" value="${isEdit ? wEsc(card.owner) : 'TD'}" placeholder="Initials e.g. TD" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(110,145,210,.2);border-radius:10px;padding:10px 14px;color:#eaf0fb;font-size:14px;box-sizing:border-box">
+          <input id="wCardOwner" value="${isEdit ? wEsc(card.owner) : 'TD'}" placeholder="Initials e.g. TD" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(110,145,210,.2);border-radius:10px;padding:10px 14px;color:var(--text);font-size:14px;box-sizing:border-box">
         </div>
         <div style="display:flex;gap:10px;margin-top:4px">
           <button onclick="wSaveCard(${isEdit ? card.id : 'null'})" style="flex:1;background:linear-gradient(135deg,#4d8dff,#3a6fd4);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:600;padding:12px;cursor:pointer">${isEdit ? 'Save Changes' : 'Add Card'}</button>
