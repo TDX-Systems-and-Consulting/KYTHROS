@@ -92,6 +92,14 @@
     html[data-theme="light"] [style*="#fed7aa"] { color: #c2410c !important; }
     html[data-theme="light"] [style*="#fbcfe8"] { color: #be185d !important; }
     html[data-theme="light"] [style*="#e0bbff"] { color: #7c3aed !important; }
+    /* Same problem, but these are CSS classes rather than inline
+       styles, so none of the [style*=...] overrides above can reach
+       them — needs a direct class-level override instead. */
+    html[data-theme="light"] .status-ok { color: #047857 !important; }
+    html[data-theme="light"] .status-warn { color: #92400e !important; }
+    html[data-theme="light"] .status-bad { color: #b91c1c !important; }
+    html[data-theme="light"] .dash-overdue-badge { color: #b91c1c !important; }
+    html[data-theme="light"] .dash-today-badge { color: #92400e !important; }
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     html,body{margin:0;padding:0;touch-action:manipulation;background:var(--page-bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     body{min-height:100vh}
@@ -317,7 +325,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.2 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.3 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -464,7 +472,7 @@
 
   <!-- ══════════════════════════════════════════════════ CALENDAR PAGE -->
   <section class="page" id="calendarPage">
-    <div class="grid grid-3">
+    <div class="grid grid-3" style="align-items:start">
       <div class="card" style="grid-column:span 2">
         <div class="card-head">
           <div><h2>Calendar</h2><p id="calViewDesc">Month view — task due dates, events, and Google Calendar.</p></div>
@@ -1774,7 +1782,13 @@ function renderCalendarSidebar(){
   const hidden=loadHiddenCals();
   const seen=new Map();
   (gcalEvents||[]).forEach(e=>{if(e._calId&&!seen.has(e._calId))seen.set(e._calId,e._calName||e._calId);});
-  if(seen.size===0){el.innerHTML='<p class="muted small">Connect Google Calendar to see calendars here.</p>';return;}
+  if(seen.size===0){
+    const connected=gcalState.connected||hasGoogleToken();
+    el.innerHTML=connected
+      ?'<p class="muted small">No calendars found yet — try Sync Drive above, or check back after your next sync.</p>'
+      :'<p class="muted small">Connect Google Calendar to see calendars here.</p>';
+    return;
+  }
   el.innerHTML=[...seen.entries()].map(([id,name])=>{
     const col=getCalColor(id,name);
     return`<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(110,145,210,.08)">
@@ -5861,7 +5875,7 @@ function renderCalWeek(){
   html+=`<div class="cwh" style="font-size:.65rem;color:var(--muted)">All day</div>`;
   weekDays.forEach(d=>{
     const allDay=events.filter(e=>e.date===d&&!e.startTime);
-    html+=`<div class="cw-cell ${d===today?'today-col':''}" style="min-height:30px;padding:4px">${allDay.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}" onclick="openEvent('${e.id}','${e.source}')">${esc(e.title)}</span>`;}).join('')}<button onclick="openFamilyEventOnDate && openFamilyEventOnDate('${d}','')" style="border:none;background:transparent;cursor:pointer;color:rgba(110,145,210,.3);font-size:1rem;width:100%;text-align:center" onclick="newEventOnDate('${d}')">+</button></div>`;
+    html+=`<div class="cw-cell ${d===today?'today-col':''}" style="min-height:30px;padding:4px">${allDay.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}22;border:1px solid ${col}44;color:${col}" onclick="openEvent('${e.id}','${e.source}')">${esc(e.title)}</span>`;}).join('')}<button onclick="openFamilyEventOnDate && openFamilyEventOnDate('${d}','')" style="border:none;background:transparent;cursor:pointer;color:rgba(110,145,210,.3);font-size:1rem;width:100%;text-align:center" onclick="newEventOnDate('${d}')">+</button></div>`;
   });
   // Hour rows
   hours.forEach(h=>{
@@ -5871,7 +5885,7 @@ function renderCalWeek(){
     weekDays.forEach(day=>{
       const hourEvs=events.filter(e=>e.date===day&&e.startTime&&parseInt(e.startTime)===h);
       const nowLine=(day===today&&nowHour>=h&&nowHour<h+1)?`<div class="cal-now-line" style="top:${((nowHour-h)*100)}%"></div>`:'';;
-      html+=`<div class="cw-cell ${day===today?'today-col':''} ${isNowRow?'now-row':''}" style="position:relative">${nowLine}${hourEvs.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}" onclick="openEvent('${e.id}','${e.source}')">${e.startTime} ${esc(e.title)}</span>`;}).join('')}</div>`;
+      html+=`<div class="cw-cell ${day===today?'today-col':''} ${isNowRow?'now-row':''}" style="position:relative">${nowLine}${hourEvs.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}22;border:1px solid ${col}44;color:${col}" onclick="openEvent('${e.id}','${e.source}')">${e.startTime} ${esc(e.title)}</span>`;}).join('')}</div>`;
     });
   });
   html+=`</div>`;
@@ -5894,7 +5908,7 @@ function renderCalDay(){
   // All-day section
   if(allDay.length){
     html+=`<div class="cw-time" style="font-size:.65rem">All day</div>`;
-    html+=`<div class="cw-cell" style="min-height:auto;padding:8px">${allDay.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col};display:inline-block;margin-right:4px;margin-bottom:4px;white-space:normal" onclick="openEvent('${e.id}','${e.source}')">${esc(e.title)}</span>`;}).join('')}</div>`;
+    html+=`<div class="cw-cell" style="min-height:auto;padding:8px">${allDay.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}22;border:1px solid ${col}44;color:${col};display:inline-block;margin-right:4px;margin-bottom:4px;white-space:normal" onclick="openEvent('${e.id}','${e.source}')">${esc(e.title)}</span>`;}).join('')}</div>`;
   }
   // Hour rows
   hours.forEach(h=>{
@@ -5902,7 +5916,7 @@ function renderCalDay(){
     const hourEvs=timed.filter(e=>parseInt(e.startTime)===h);
     const nowLine=(iso===today&&nowHour>=h&&nowHour<h+1)?`<div class="cal-now-line" style="top:${((nowHour-h)*100)}%"></div>`:'';
     html+=`<div class="cw-time">${label}</div>`;
-    html+=`<div class="cw-cell" style="position:relative;min-height:56px">${nowLine}${hourEvs.map(e=>{const col=getEventColor(e);const locLink=e.location?`<span onclick="event.stopPropagation();openLocationInMaps('${esc(e.location).replace(/'/g,"\\'")}');" style="font-size:.75rem;opacity:.8;cursor:pointer;text-decoration:underline;text-decoration-style:dotted">📍 ${esc(e.location)}</span>`:'';return`<div style="background:${col};border-radius:8px;padding:6px 10px;margin-bottom:4px;cursor:pointer;color:#fff" onclick="openEvent('${e.id}','${e.source}')"><div style="font-weight:700;font-size:.85rem">${esc(e.title)}</div><div style="display:flex;gap:8px;align-items:center;margin-top:2px">${e.startTime?`<span style="font-size:.75rem;opacity:.8">${e.startTime}${e.endTime?' – '+e.endTime:''}</span>`:''}${locLink}</div></div>`;}).join('')}</div>`;
+    html+=`<div class="cw-cell" style="position:relative;min-height:56px">${nowLine}${hourEvs.map(e=>{const col=getEventColor(e);const locLink=e.location?`<span onclick="event.stopPropagation();openLocationInMaps('${esc(e.location).replace(/'/g,"\\'")}');" style="font-size:.75rem;opacity:.8;cursor:pointer;text-decoration:underline;text-decoration-style:dotted">📍 ${esc(e.location)}</span>`:'';return`<div style="background:${col}1c;border:1px solid ${col}44;border-radius:8px;padding:6px 10px;margin-bottom:4px;cursor:pointer;color:${col}" onclick="openEvent('${e.id}','${e.source}')"><div style="font-weight:700;font-size:.85rem">${esc(e.title)}</div><div style="display:flex;gap:8px;align-items:center;margin-top:2px">${e.startTime?`<span style="font-size:.75rem;opacity:.8">${e.startTime}${e.endTime?' – '+e.endTime:''}</span>`:''}${locLink}</div></div>`;}).join('')}</div>`;
   });
   html+=`</div>`;
   grid.innerHTML=html;
