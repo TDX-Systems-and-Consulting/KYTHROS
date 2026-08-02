@@ -100,7 +100,7 @@
     .topbar,.tabs,.card{background:var(--card-bg);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
     .topbar{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:18px 22px;margin-bottom:16px}
     .brand h1{margin:0;font-size:2rem;line-height:1.05}.brand p{margin:8px 0 0;color:var(--muted)}
-    .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.btn{border:1px solid var(--line);background:rgba(17,34,65,.95);color:var(--text);padding:11px 15px;border-radius:14px;cursor:pointer;font-size:1rem;height:46px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.btn:active{opacity:.8}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.btn{border:1px solid var(--line);background:rgba(var(--panel-rgb),.95);color:var(--text);padding:11px 15px;border-radius:14px;cursor:pointer;font-size:1rem;height:46px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.btn:active{opacity:.8}
     .btn-primary{background:linear-gradient(180deg,var(--blue),var(--blue2))}.btn-danger{background:linear-gradient(180deg,#c94343,#982d2d)}.btn-green{background:linear-gradient(180deg,#2fca97,#149869)}
     .tabs{display:flex;gap:10px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:10px 12px;margin-bottom:16px}.tabs::-webkit-scrollbar{display:none}.tab{background:transparent;border:1px solid transparent;color:var(--muted);padding:11px 16px;border-radius:13px;cursor:pointer;flex-shrink:0;white-space:nowrap}.tab.active,.subtab.active{background:linear-gradient(180deg,var(--blue),var(--blue2));color:#fff;border-color:rgba(255,255,255,.08)}
     .sync-option{display:flex;align-items:center;gap:12px;background:rgba(var(--surface2-rgb),.6);border:1px solid rgba(110,145,210,.18);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
@@ -317,7 +317,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.1 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.2 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
