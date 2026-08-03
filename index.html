@@ -346,7 +346,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.3 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.4 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -6314,15 +6314,25 @@ function setPlannerMode(mode, btn) {
     workPanel.style.display = 'none';
     if (mainTabs) mainTabs.style.display = '';
     if (newTaskBtn) newTaskBtn.style.display = '';
-    // Restore active personal page
-    const activeTab = document.querySelector('#mainTabs .tab.active');
-    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-    if (activeTab) {
-      const pg = document.getElementById(activeTab.dataset.page);
-      if (pg) pg.style.display = '';
-    } else {
+    // Just clear any inline display override and let the .page/
+    // .page.active CSS classes (already correctly maintained by
+    // switchTab()) take back over — safer than hiding every page then
+    // trying to re-derive and restore just one: if that restore step
+    // ever failed to match the right page (e.g. no tab currently had
+    // .active for any reason), every page stayed hidden with nothing
+    // to fall back on, which is exactly what 'clicking Personal blanks
+    // every page' was.
+    document.querySelectorAll('.page').forEach(p => { p.style.display = ''; });
+    // Safety net: if nothing currently has .active (shouldn't normally
+    // happen, but this exact scenario is what caused every page to
+    // stay blank before), default to Dashboard so there's always
+    // something visible rather than a blank page with no fallback.
+    if (!document.querySelector('.page.active')) {
       const dash = document.getElementById('dashboardPage');
-      if (dash) dash.style.display = '';
+      if (dash) dash.classList.add('active');
+      document.querySelectorAll('#mainTabs .tab').forEach(b => b.classList.remove('active'));
+      const dashBtn = document.querySelector('#mainTabs .tab[data-page="dashboardPage"]');
+      if (dashBtn) dashBtn.classList.add('active');
     }
   }
 }
