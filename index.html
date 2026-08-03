@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.7 · 03/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.8 · 03/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -7051,59 +7051,65 @@ function wRenderJmPulseRows() {
     </div>`).join('');
 }
 
-async function pullJobsMetrixNotifications(uid) {
+let _jmNotificationsUnsub = null;
+
+function subscribeJobsMetrixNotifications(uid) {
   const db = getJobsMetrixDb();
   if (!db || !uid) { console.warn('JM bridge: no db or uid'); return; }
 
-  console.log('JM bridge: checking notifications for uid', uid);
+  if (_jmNotificationsUnsub) { try { _jmNotificationsUnsub(); } catch(e){} }
 
-  try {
-    const snap = await db.collection('plannerxd_notifications').doc(uid)
-      .collection('items')
-      .where('read', '==', false)
-      .limit(20)
-      .get();
+  // Live listener instead of a one-time pull — a one-time pull only
+  // ever ran once at page load, so any notification created WHILE the
+  // tab was already open (e.g. a customer signing a proposal mid-
+  // session) was silently missed until the next full refresh. Same
+  // fix already applied to the pulse sync earlier.
+  _jmNotificationsUnsub = db.collection('plannerxd_notifications').doc(uid)
+    .collection('items')
+    .where('read', '==', false)
+    .limit(20)
+    .onSnapshot(snap => {
+      if (snap.empty) return;
 
-    console.log('JM bridge: found', snap.size, 'unread notifications');
+      const newTasks = [];
+      const batch = db.batch();
 
-    if (snap.empty) return;
+      snap.forEach(doc => {
+        const item = doc.data();
+        const alreadyExists = workState.tasks.some(t => t.jobsMetrixId === doc.id);
+        if (alreadyExists) return;
 
-    const newTasks = [];
-    const batch = db.batch();
+        newTasks.push({
+          id: Date.now() + Math.random(),
+          jobsMetrixId: doc.id,
+          title: item.title || 'JOBSMETRIX notification',
+          note: item.body || '',
+          quadrant: 'do',
+          done: false,
+          source: 'jobsmetrix',
+          jobId: item.jobId || null,
+          createdMs: item.createdMs || Date.now()
+        });
 
-    snap.forEach(doc => {
-      const item = doc.data();
-
-      const alreadyExists = workState.tasks.some(t => t.jobsMetrixId === doc.id);
-      if (alreadyExists) return;
-
-      newTasks.push({
-        id: Date.now() + Math.random(),
-        jobsMetrixId: doc.id,
-        title: item.title || 'JOBSMETRIX notification',
-        note: item.body || '',
-        quadrant: 'do',
-        done: false,
-        source: 'jobsmetrix',
-        jobId: item.jobId || null,
-        createdMs: item.createdMs || Date.now()
+        batch.update(doc.ref, { read: true, readAt: firebase.firestore.FieldValue.serverTimestamp() });
       });
 
-      batch.update(doc.ref, { read: true, readAt: firebase.firestore.FieldValue.serverTimestamp() });
-    });
+      if (!newTasks.length) return;
 
-    if (!newTasks.length) return;
+      workState.tasks = [...newTasks, ...workState.tasks];
+      batch.commit().catch(e => console.warn('JM bridge mark-read error:', e));
+      scheduleWorkSave();
+      renderWPriorities();
 
-    workState.tasks = [...newTasks, ...workState.tasks];
-    await batch.commit();
-    scheduleWorkSave();
-    renderWPriorities();
+      showJMToast(`${newTasks.length} new JOBSMETRIX task${newTasks.length > 1 ? 's' : ''} added to Do First`);
+    }, e => console.warn('JOBSMETRIX notification listener error:', e));
+}
+window.subscribeJobsMetrixNotifications = subscribeJobsMetrixNotifications;
 
-    showJMToast(`${newTasks.length} new JOBSMETRIX task${newTasks.length > 1 ? 's' : ''} added to Do First`);
-
-  } catch(e) {
-    console.warn('JOBSMETRIX notification pull error:', e);
-  }
+// Kept for any remaining call sites — now just a thin wrapper around the
+// live subscription above, so nothing else needs to change.
+async function pullJobsMetrixNotifications(uid) {
+  subscribeJobsMetrixNotifications(uid);
 }
 
 // Simple non-blocking toast
