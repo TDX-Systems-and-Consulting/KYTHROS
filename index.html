@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.6 · 03/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.7 · 03/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -6097,6 +6097,28 @@ function renderUpcoming(){
   const t=new Date(today+'T00:00:00');t.setDate(t.getDate()+1);
   const tomorrow=t.toISOString().slice(0,10);
 
+  const rowHtml=(x,showDue)=>{
+    const done=x.status==='Done';
+    const col=eventColor({source:'task',stream:x.stream||'',_project:x.project||''});
+    const time=x.startTime?`${x.startTime}${x.endTime?'–'+x.endTime:''}`:'';
+    const overdueTag=showDue?`<span style="color:#ff8a80;font-weight:700">${esc(fmtDate(x.due))}</span>`:'';
+    return`<div class="tt-row ${done?'tt-done':''}" ${showDue?'style="border-color:rgba(239,83,80,.38)"':''}>
+      <input type="checkbox" ${done?'checked':''} onchange="toggleTaskDone('${x.id}',this.checked)" />
+      <div style="flex:1;min-width:0;cursor:pointer" onclick="openTask('${x.id}')">
+        <div class="tt-title">${esc(x.title)}</div>
+        <div class="tt-meta"><span class="tt-dot" style="background:${col}"></span>${overdueTag}${time?`<span>${esc(time)}</span>`:''}<span style="color:${col}">${esc(x.project||x.stream||'—')}</span></div>
+      </div>
+    </div>`;
+  };
+
+  // Anything still open with a due date in the past sits above Today.
+  const overdue=state.tasks
+    .filter(x=>x.due&&x.due<today&&x.status!=='Done')
+    .sort((a,b)=>(a.due||'').localeCompare(b.due||''));
+  const overdueHtml=overdue.length
+    ? `<div class="tt-group-head" style="color:#ff8a80">Past Due · ${overdue.length}</div>${overdue.map(x=>rowHtml(x,true)).join('')}<div style="height:10px"></div>`
+    : '';
+
   const groupHtml=(label,iso)=>{
     const rows=state.tasks
       .filter(x=>x.due===iso)
@@ -6105,22 +6127,10 @@ function renderUpcoming(){
         return (a.startTime||'99:99').localeCompare(b.startTime||'99:99');
       });
     if(!rows.length)return`<div class="tt-group-head">${label}</div><div class="muted small" style="margin-bottom:12px">Nothing due.</div>`;
-    const items=rows.map(x=>{
-      const done=x.status==='Done';
-      const col=eventColor({source:'task',stream:x.stream||'',_project:x.project||''});
-      const time=x.startTime?`${x.startTime}${x.endTime?'–'+x.endTime:''}`:'';
-      return`<div class="tt-row ${done?'tt-done':''}">
-        <input type="checkbox" ${done?'checked':''} onchange="toggleTaskDone('${x.id}',this.checked)" />
-        <div style="flex:1;min-width:0;cursor:pointer" onclick="openTask('${x.id}')">
-          <div class="tt-title">${esc(x.title)}</div>
-          <div class="tt-meta"><span class="tt-dot" style="background:${col}"></span>${time?`<span>${esc(time)}</span>`:''}<span style="color:${col}">${esc(x.project||x.stream||'—')}</span></div>
-        </div>
-      </div>`;
-    }).join('');
-    return`<div class="tt-group-head">${label}</div>${items}<div style="height:10px"></div>`;
+    return`<div class="tt-group-head">${label}</div>${rows.map(x=>rowHtml(x,false)).join('')}<div style="height:10px"></div>`;
   };
 
-  el.innerHTML=groupHtml('Today · '+fmtDate(today),today)+groupHtml('Tomorrow · '+fmtDate(tomorrow),tomorrow);
+  el.innerHTML=overdueHtml+groupHtml('Today · '+fmtDate(today),today)+groupHtml('Tomorrow · '+fmtDate(tomorrow),tomorrow);
 }
 
 // Checking the box sets the task to Done, which is the same status the Kanban
