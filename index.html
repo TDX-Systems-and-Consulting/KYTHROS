@@ -346,7 +346,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.0 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.1 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -5857,11 +5857,19 @@ function switchTab(pageId,btn){
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   if(btn){btn.classList.add('active');try{btn.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});}catch(e){}}
   var pg=document.getElementById(pageId);if(pg)pg.classList.add('active');
-  if(pageId==='notesPage'){try{resizeCanvas();redrawCurrentNote();}catch(e){}}
+  if(pageId==='notesPage'){try{resizeCanvas();redrawCurrentNote();}catch(e){}try{renderNotesList();}catch(e){console.error('Notes render failed:',e);}}
   if(pageId==='familyPage'){try{renderFamilyPage();}catch(e){}}
   if(pageId==='dashboardPage'){try{renderDashboard();}catch(e){}}
   else{clearInterval(_dashClockTimer);}
   if(pageId==='kythyPage'){try{initKythy();}catch(e){}}
+  if(pageId==='calendarPage'){try{renderCalendar();}catch(e){console.error('Calendar render failed:',e);}try{renderCalendarSidebar();}catch(e){console.error('Calendar sidebar render failed:',e);}}
+  if(pageId==='projectsPage'){
+    try{const tasks=filteredTasks();renderStats(tasks);renderGantt(tasks);renderKanban(tasks);renderList(tasks);renderEisenhower();}
+    catch(e){console.error('Projects render failed:',e);}
+  }
+  if(pageId==='timelinePage'){try{renderTimeline();}catch(e){console.error('Timeline render failed:',e);}}
+  if(pageId==='budgetPage'){try{renderBudget();}catch(e){console.error('Budget render failed:',e);}}
+  if(pageId==='recipesPage'){try{renderRecipes();}catch(e){console.error('Recipes render failed:',e);}}
 }
 function switchView(viewId,btn){
   currentProjectView=viewId;
