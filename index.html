@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.12.0 · 03/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.12.1 · 03/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -7075,7 +7075,9 @@ let _jmNotificationsUnsub = null;
 
 function subscribeJobsMetrixNotifications(uid) {
   const db = getJobsMetrixDb();
-  if (!db || !uid) { console.warn('JM bridge: no db or uid'); return; }
+  if (!db || !uid) { console.warn('JM bridge: no db or uid — db:', !!db, 'uid:', uid); return; }
+
+  console.log('JM bridge: subscribing to plannerxd_notifications for uid =', uid);
 
   if (_jmNotificationsUnsub) { try { _jmNotificationsUnsub(); } catch(e){} }
 
@@ -7089,6 +7091,7 @@ function subscribeJobsMetrixNotifications(uid) {
     .where('read', '==', false)
     .limit(20)
     .onSnapshot(snap => {
+      console.log('JM bridge: snapshot fired —', snap.size, 'unread item(s) found for uid', uid);
       if (snap.empty) return;
 
       const newTasks = [];
@@ -7096,8 +7099,9 @@ function subscribeJobsMetrixNotifications(uid) {
 
       snap.forEach(doc => {
         const item = doc.data();
+        console.log('JM bridge: item', doc.id, '=', item);
         const alreadyExists = workState.tasks.some(t => t.jobsMetrixId === doc.id);
-        if (alreadyExists) return;
+        if (alreadyExists) { console.log('JM bridge: item', doc.id, 'already exists locally, skipping'); return; }
 
         newTasks.push({
           id: Date.now() + Math.random(),
@@ -7114,6 +7118,7 @@ function subscribeJobsMetrixNotifications(uid) {
         batch.update(doc.ref, { read: true, readAt: firebase.firestore.FieldValue.serverTimestamp() });
       });
 
+      console.log('JM bridge:', newTasks.length, 'new task(s) to add to Do First');
       if (!newTasks.length) return;
 
       workState.tasks = [...newTasks, ...workState.tasks];
