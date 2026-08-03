@@ -346,7 +346,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.8 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.10.9 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -973,12 +973,26 @@ function initFirebase() {
       if (user) {
         _currentUser = user;
         hideAuthScreen();
-        const isSubscribed = await showPaywallIfNeeded(user);
-        if (isSubscribed) {
-          await loadUserDataFromFirestore();
-          renderAll(); renderUserBadge(); initFocusMode(); initCalendarRoutingEngine();
-          // Auto-load Google scripts and attempt silent token restore
-          loadGoogleScripts();
+        try {
+          const isSubscribed = await showPaywallIfNeeded(user);
+          if (isSubscribed) {
+            await loadUserDataFromFirestore();
+            renderAll();
+            try{renderUserBadge();}catch(e){console.error('renderUserBadge failed:',e);}
+            try{initFocusMode();}catch(e){console.error('initFocusMode failed:',e);}
+            try{initCalendarRoutingEngine();}catch(e){console.error('initCalendarRoutingEngine failed:',e);}
+            // Auto-load Google scripts and attempt silent token restore
+            loadGoogleScripts();
+          }
+        } catch(e) {
+          // A transient failure anywhere in this sequence (network drop
+          // mid-request, etc.) would otherwise leave the app stuck past
+          // the auth screen with nothing ever rendered — matches
+          // 'screen goes blank sometimes, refresh fixes it'. Fall back
+          // to rendering with whatever's in memory/cache rather than
+          // leaving a blank page.
+          console.error('Post-auth boot sequence failed, rendering with whatever data is available:', e);
+          try{renderAll();}catch(e2){console.error('renderAll fallback also failed:',e2);}
         }
       } else {
         _currentUser = null;
@@ -4744,7 +4758,39 @@ function renderDashMealsToday(){
 }
 // ════════════════════════════════════════════════════
 
-function renderAll(){renderDashboard();renderFilters();const tasks=filteredTasks();renderStats(tasks);renderGantt(tasks);renderKanban(tasks);renderList(tasks);renderEisenhower();renderCalendar();renderCalendarSidebar();renderBudget();renderNotesList();loadSelectedNoteIntoEditor();renderRecipes();renderGcalStatus();renderTimeline();renderFamilyPage();renderGoals();renderWeeklyReview();renderRocks();renderScorecard();renderIssues();}
+function renderAll(){
+  // Each render step isolated in its own try/catch. Previously this was
+  // one unguarded chain of ~20 calls — if any single one threw (a
+  // transient network hiccup hitting a live Google Calendar call
+  // inside renderCalendar(), for instance), every function listed
+  // AFTER it in the chain silently never ran, leaving those pages
+  // blank until a manual refresh reset everything. Reported as
+  // 'sometimes the screen goes blank, refreshing fixes it' — this is
+  // why: it wasn't data loss, it was one failed step taking the rest
+  // of the render pipeline down with it.
+  const steps=[
+    ['renderDashboard',()=>renderDashboard()],
+    ['renderFilters',()=>renderFilters()],
+    ['renderStats/Gantt/Kanban/List',()=>{const tasks=filteredTasks();renderStats(tasks);renderGantt(tasks);renderKanban(tasks);renderList(tasks);}],
+    ['renderEisenhower',()=>renderEisenhower()],
+    ['renderCalendar',()=>renderCalendar()],
+    ['renderCalendarSidebar',()=>renderCalendarSidebar()],
+    ['renderBudget',()=>renderBudget()],
+    ['renderNotesList',()=>{renderNotesList();loadSelectedNoteIntoEditor();}],
+    ['renderRecipes',()=>renderRecipes()],
+    ['renderGcalStatus',()=>renderGcalStatus()],
+    ['renderTimeline',()=>renderTimeline()],
+    ['renderFamilyPage',()=>renderFamilyPage()],
+    ['renderGoals',()=>renderGoals()],
+    ['renderWeeklyReview',()=>renderWeeklyReview()],
+    ['renderRocks',()=>renderRocks()],
+    ['renderScorecard',()=>renderScorecard()],
+    ['renderIssues',()=>renderIssues()],
+  ];
+  steps.forEach(([name,fn])=>{
+    try{fn();}catch(e){console.error(`renderAll: ${name} failed, continuing with the rest —`,e);}
+  });
+}
 
 // ════════════════════════════════════════════════════
 // ── TIMELINE SYSTEM ──
