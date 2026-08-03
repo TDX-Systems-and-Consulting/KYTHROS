@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.9 · 03/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.12.0 · 03/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -814,6 +814,7 @@
 <input type="hidden" id="upSyncPref" value="google" /></div>
 <div class="full"><div style="font-weight:600;margin-bottom:6px">Shared Read Calendar <span style="font-weight:400;color:var(--muted);font-size:.82rem">(pull into PlannerXD)</span></div><div style="display:flex;gap:8px;margin-bottom:8px"><select id="upSharedCalPicker" style="flex:1" onchange="applySharedCalendarPicker()"><option value="">Connect Google to load calendars</option></select><button class="btn" onclick="refreshGoogleCalendarList()" style="flex-shrink:0">Refresh</button></div><input id="upSharedCal" class="full" placeholder="family@group.calendar.google.com" /><div id="upCalendarPickerStatus" style="font-size:.78rem;color:var(--muted);margin-top:6px"></div></div>
 <div class="full"><div style="font-weight:600;margin-bottom:6px">Family Calendars <span style="font-weight:400;color:var(--muted);font-size:.82rem">(push events to these)</span></div><div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Add calendars you have write access to — used when creating events.</div><div id="upFamilyCalList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div><div style="display:flex;gap:8px;margin-bottom:8px"><select id="upFamilyCalPicker" style="flex:1" onchange="applyFamilyCalendarPicker()"><option value="">Connect Google to load calendars</option></select><button class="btn" onclick="refreshGoogleCalendarList()" style="flex-shrink:0">Refresh</button></div><div style="display:flex;gap:8px"><input id="upFcName" placeholder="Name (e.g. Ashley)" style="flex:0 0 130px" /><input id="upFcId" placeholder="Calendar ID" style="flex:1" /><button class="btn btn-primary" onclick="addFamilyCalendar()" style="flex-shrink:0">Add</button></div></div>
+<div class="full" style="border-top:1px solid rgba(59,130,246,.2);padding-top:14px;background:rgba(59,130,246,.05);border-radius:12px;padding:12px 14px"><div style="font-weight:600;color:#93c5fd;margin-bottom:4px;font-size:.9rem">🔗 JOBSMETRIX Linking</div><div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Paste this exact value into JOBSMETRIX's Company Settings → PlannerXD Integration → PlannerXD User ID. This is what lets JOBSMETRIX push things (signed proposals, alerts, live numbers) into your Do First list and Weekly Pulse — it only works once both sides have this same value.</div><div style="display:flex;gap:8px;align-items:center"><input id="upMyUserId" class="full" readonly style="flex:1;font-family:monospace;font-size:.82rem;background:rgba(var(--surface2-rgb),.6)" /><button class="btn" onclick="copyMyUserId()" style="flex-shrink:0">Copy</button></div></div>
 <div class="full" style="border-top:1px solid rgba(110,145,210,.12);padding-top:14px"><div style="font-weight:600;margin-bottom:6px">KYTHY AI Settings</div><div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Anthropic API key — get a free key at <strong>console.anthropic.com</strong></div><input id="upApiKey" class="full" type="password" placeholder="sk-ant-..." autocomplete="off" /></div>
 <div class="full" style="border-top:1px solid rgba(239,83,80,.15);padding-top:14px;background:rgba(239,83,80,.05);border-radius:12px;padding:12px 14px"><div style="font-weight:600;color:#ef5350;margin-bottom:4px;font-size:.9rem">⚠ New User Setup</div><div style="font-size:.8rem;color:var(--muted);margin-bottom:10px">First time using KYTHROS? Clear the sample data to start fresh. <strong>Cannot be undone.</strong></div><button class="btn btn-danger" style="width:100%" onclick="kClose('userProfileModal');clearSampleData()">Clear Sample Data &amp; Start Fresh</button></div>
 </div></div><div class="modal-foot"><button class="btn btn-primary" onclick="saveUserProfile_modal()">Save Profile</button></div></div></div>
@@ -4043,6 +4044,13 @@ function openUserProfile(){
   document.getElementById('upSharedCal').value=p.sharedCalendarId||'';
   document.getElementById('upApiKey').value=p.anthropicKey||'';
   document.getElementById('upSyncPref').value=p.syncPref||'google';
+  // The exact value JOBSMETRIX's PlannerXD Integration needs — this is
+  // PlannerXD's own Firebase Auth UID (this project, 'plannerxd'), a
+  // completely different value from any JOBSMETRIX login. Previously
+  // JOBSMETRIX was auto-setting its own UID here instead, which is why
+  // the notification bridge never actually worked.
+  const idEl=document.getElementById('upMyUserId');
+  if(idEl)idEl.value=_currentUser?.uid||'(sign in to see your User ID)';
   // Highlight selected sync option
   selectSyncOption(p.syncPref||'google');
   renderFamilyCalList(p.familyCalendars||[]);
@@ -4050,6 +4058,18 @@ function openUserProfile(){
   document.getElementById('userProfileModal').style.display='flex';
   if((gcalState.connected||hasGoogleToken())&&!googleCalendarList.length)fetchGoogleCalendarList().catch(console.error);
 }
+
+function copyMyUserId(){
+  const idEl=document.getElementById('upMyUserId');
+  if(!idEl||!idEl.value)return;
+  navigator.clipboard?.writeText(idEl.value).then(()=>{
+    showJMToast?.('Copied — paste into JOBSMETRIX Company Settings');
+  }).catch(()=>{
+    idEl.select();
+    document.execCommand('copy');
+  });
+}
+window.copyMyUserId=copyMyUserId;
 
 function renderFamilyCalList(cals){
   const el=document.getElementById('upFamilyCalList');if(!el)return;
