@@ -346,7 +346,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.4 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.5 · 03/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -1492,8 +1492,36 @@ const STREAM_PILL_CLASS={'383':'stream-383','STONEHAVEN':'stream-stonehaven','MI
 function streamPillClass(s){return STREAM_PILL_CLASS[(s||'').toUpperCase()]||''}
 const _PROJECT_PALETTE=['#4d8dff','#1dbb87','#f3b33d','#a855f7','#e63946','#fb923c','#06b6d4','#ec4899','#84cc16','#f97316','#8b5cf6','#14b8a6','#f43f5e','#0ea5e9','#eab308'];
 function projectColor(name){if(!name)return'#98a7c4';let h=0;for(let i=0;i<name.length;i++)h=((h<<5)-h+name.charCodeAt(i))|0;return _PROJECT_PALETTE[Math.abs(h)%_PROJECT_PALETTE.length];}
+// ── Single source of truth for calendar/event colors ──
+// Month, Week, Day and the day-view modal all resolve through eventColor()
+// so the same task is the same color in every view.
+const _STREAM_COLORS={
+  '383':'#d4a017',
+  'STONEHAVEN':'#1dbb87',
+  'MINISTRY':'#a855f7',
+  '315':'#e63946',
+  'KYTHROS':'#fb923c',
+  'REALESTATE':'#1d4ed8',
+  'EOS':'#84cc16',
+  'MULTIENTITY':'#a855f7',
+  'JOBSMETRIX':'#fb923c'
+};
+// Reverse lookup: month-view events carry a project name, not a stream key.
+const _PROJECT_TO_STREAM=(()=>{const m={};Object.keys(STREAM_PROJECT_MAP).forEach(k=>{m[STREAM_PROJECT_MAP[k].toLowerCase()]=k;});return m;})();
+function streamKeyFor(ev){
+  const s=(ev&&ev.stream||'').toUpperCase();
+  if(s&&_STREAM_COLORS[s])return s;
+  const name=((ev&&(ev._project||ev.location))||'').trim().toLowerCase();
+  return _PROJECT_TO_STREAM[name]||'';
+}
+function eventColor(ev){
+  const k=streamKeyFor(ev);
+  if(k)return _STREAM_COLORS[k];
+  if(ev&&ev.source==='gcal')return getCalColor(ev._calId||'',ev._calName||'');
+  return projectColor((ev&&(ev._project||ev.location))||'');
+}
 function chipStyle(col){return`background:${col}22;border:1px solid ${col}55;color:${col};`;}
-function calendarEventChipStyle(ev){const col=ev.source==='task'?projectColor(ev._project||ev.location||''):getCalColor(ev._calId||'',ev._calName||'');return chipStyle(col);}
+function calendarEventChipStyle(ev){return chipStyle(eventColor(ev));}
 function taskTypeBadge(type){
   if(!type) return '';
   const t=(type||'').toUpperCase();
@@ -6023,10 +6051,7 @@ function renderCalDay(){
 }
 
 function getEventColor(e){
-  if(e.stream){const m={'383':'#d4a017','STONEHAVEN':'#1dbb87','MINISTRY':'#a855f7','315':'#e63946','KYTHROS':'#fb923c','REALESTATE':'#38bdf8','EOS':'#84cc16','MULTIENTITY':'#0ea5e9','JOBSMETRIX':'#6366f1'};return m[e.stream]||'#4d8dff';}
-  if(e.source==='gcal')return'#1dbb87';
-  if(e.source==='task')return'#d4a017';
-  return'#4d8dff';
+  return eventColor(e);
 }
 
 function openDayView(iso){
@@ -6042,7 +6067,7 @@ function openDayView(iso){
   } else {
     const sorted=[...events].sort((a,b)=>(a.startTime||'99:99').localeCompare(b.startTime||'99:99'));
     document.getElementById('dayViewContent').innerHTML=sorted.map(e=>{
-      const col=e.source==='task'?projectColor(e._project||e.location||''):getCalColor(e._calId||'',e._calName||'');
+      const col=eventColor(e);
       const time=e.startTime?`<span style="font-size:.8rem;opacity:.75">${e.startTime}${e.endTime?' – '+e.endTime:''}</span>`:'<span style="font-size:.8rem;opacity:.55">All day</span>';
       const sub=e.source==='task'?(e._project||e.location||'Task'):(e._calName||'Google Calendar');
       return`<div onclick="kClose('dayViewModal');openEvent('${e.id}','${e.source}')" style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;margin-bottom:8px;cursor:pointer;background:${col}18;border:1px solid ${col}44"><div style="width:4px;height:100%;min-height:36px;border-radius:4px;background:${col};flex-shrink:0"></div><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.title)}</div><div style="display:flex;gap:10px;margin-top:3px;align-items:center">${time}<span style="font-size:.78rem;color:${col}">${esc(sub)}</span></div></div></div>`;
