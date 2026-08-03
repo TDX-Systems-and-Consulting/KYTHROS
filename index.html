@@ -259,6 +259,15 @@
     @media(max-width:1100px){.dash-body{grid-template-columns:1fr}.dash-stats{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:600px){.dash-stats{grid-template-columns:repeat(2,1fr)}.dash-time{font-size:3rem}}
     /* ── Calendar week/day views ── */
+    .cal-page-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px}
+    @media(max-width:1100px){.cal-page-grid{grid-template-columns:1fr}}
+    .tt-group-head{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:2px 0 8px}
+    .tt-row{display:flex;align-items:flex-start;gap:9px;background:rgba(var(--panel-rgb),.5);border:1px solid rgba(110,145,210,.14);border-radius:10px;padding:9px 10px;margin-bottom:7px}
+    .tt-row input[type=checkbox]{width:17px;height:17px;flex-shrink:0;margin-top:1px;cursor:pointer;accent-color:#1dbb87}
+    .tt-title{font-weight:650;font-size:.83rem;line-height:1.35;word-break:break-word}
+    .tt-meta{font-size:.7rem;color:var(--muted);margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .tt-done .tt-title{text-decoration:line-through;opacity:.45}
+    .tt-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
     .cal-week-grid{display:grid;grid-template-columns:52px repeat(7,minmax(0,1fr));border:1px solid rgba(110,145,210,.16);border-radius:16px;overflow:hidden}
     .cal-day-grid{display:grid;grid-template-columns:52px 1fr;border:1px solid rgba(110,145,210,.16);border-radius:16px;overflow:hidden}
     .cwh{background:rgba(var(--panel-rgb),.98);padding:8px 6px;text-align:center;font-size:.8rem;font-weight:700;border-right:1px solid rgba(110,145,210,.12);border-bottom:1px solid rgba(110,145,210,.16)}
@@ -346,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.5 · 03/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.6 · 03/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -492,8 +501,8 @@
 
   <!-- ══════════════════════════════════════════════════ CALENDAR PAGE -->
   <section class="page" id="calendarPage">
-    <div class="grid grid-3" style="align-items:start">
-      <div class="card" style="grid-column:span 2">
+    <div class="cal-page-grid" style="align-items:start">
+      <div class="card">
         <div class="card-head">
           <div><h2>Calendar</h2><p id="calViewDesc">Month view — task due dates, events, and Google Calendar.</p></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -530,7 +539,7 @@
         </div>
       </div>
       <div class="card" id="myCalendarsCard" style="margin-bottom:16px"><div class="card-head"><div><h2>My Calendars</h2><p>Show or hide individual calendars.</p></div></div><div class="card-body" id="calendarSidebar"><p class="muted small">Connect Google Calendar to see calendars here.</p></div></div>
-      <div class="card"><div class="card-head"><div><h2>Upcoming</h2><p>Next 10 events and task deadlines.</p></div></div><div class="card-body" id="upcomingList" style="display:flex;flex-direction:column;gap:10px"></div></div>
+      <div class="card"><div class="card-head"><div><h2>Today &amp; Tomorrow</h2><p>Check off to complete.</p></div></div><div class="card-body" id="upcomingList" style="display:flex;flex-direction:column;gap:4px"></div></div>
     </div>
   </section>
 
@@ -6083,8 +6092,45 @@ function newEventOnDate(date){
 }
 
 function renderUpcoming(){
-  const events=allCalendarEvents().slice().sort((a,b)=>((a.date||'')+(a.startTime||'')).localeCompare((b.date||'')+(b.startTime||''))).filter(e=>e.date>=todayISO()).slice(0,10);
-  document.getElementById('upcomingList').innerHTML=events.map(item=>`<div class="upcoming-card"><div class="task-title">${esc(item.title)}</div><div class="meta-line">${fmtDate(item.date)}${item.startTime?`  -  ${item.startTime}${item.endTime?' - '+item.endTime:''}`:''} ${item.location?`  -  ${esc(item.location)}`:''}</div>${item.notes?`<div class="meta-line">${esc(item.notes)}</div>`:''}</div>`).join('')||'<div class="muted">Nothing upcoming.</div>';
+  const el=document.getElementById('upcomingList');if(!el)return;
+  const today=todayISO();
+  const t=new Date(today+'T00:00:00');t.setDate(t.getDate()+1);
+  const tomorrow=t.toISOString().slice(0,10);
+
+  const groupHtml=(label,iso)=>{
+    const rows=state.tasks
+      .filter(x=>x.due===iso)
+      .sort((a,b)=>{
+        if((a.status==='Done')!==(b.status==='Done'))return a.status==='Done'?1:-1;
+        return (a.startTime||'99:99').localeCompare(b.startTime||'99:99');
+      });
+    if(!rows.length)return`<div class="tt-group-head">${label}</div><div class="muted small" style="margin-bottom:12px">Nothing due.</div>`;
+    const items=rows.map(x=>{
+      const done=x.status==='Done';
+      const col=eventColor({source:'task',stream:x.stream||'',_project:x.project||''});
+      const time=x.startTime?`${x.startTime}${x.endTime?'–'+x.endTime:''}`:'';
+      return`<div class="tt-row ${done?'tt-done':''}">
+        <input type="checkbox" ${done?'checked':''} onchange="toggleTaskDone('${x.id}',this.checked)" />
+        <div style="flex:1;min-width:0;cursor:pointer" onclick="openTask('${x.id}')">
+          <div class="tt-title">${esc(x.title)}</div>
+          <div class="tt-meta"><span class="tt-dot" style="background:${col}"></span>${time?`<span>${esc(time)}</span>`:''}<span style="color:${col}">${esc(x.project||x.stream||'—')}</span></div>
+        </div>
+      </div>`;
+    }).join('');
+    return`<div class="tt-group-head">${label}</div>${items}<div style="height:10px"></div>`;
+  };
+
+  el.innerHTML=groupHtml('Today · '+fmtDate(today),today)+groupHtml('Tomorrow · '+fmtDate(tomorrow),tomorrow);
+}
+
+// Checking the box sets the task to Done, which is the same status the Kanban
+// board groups by — so the card moves to the Done lane on the next render.
+async function toggleTaskDone(id,checked){
+  const t=state.tasks.find(x=>x.id===id);if(!t)return;
+  t.status=checked?'Done':'To Do';
+  t.progress=checked?100:(t.progress===100?0:(Number(t.progress)||0));
+  saveState();renderAll();
+  if(gcalState.connected||hasGoogleToken()){try{await syncSingleTaskToGoogle(t)}catch(e){console.error(e)}}
 }
 function setPen(){currentTool='pen';var a=document.getElementById('penToolBtn'),b=document.getElementById('eraserToolBtn');if(a)a.classList.add('btn-primary');if(b)b.classList.remove('btn-primary');}
 function setEraser(){currentTool='eraser';var a=document.getElementById('eraserToolBtn'),b=document.getElementById('penToolBtn');if(a)a.classList.add('btn-primary');if(b)b.classList.remove('btn-primary');}
@@ -6097,7 +6143,7 @@ window.openScorecardForm=openScorecardForm;window.deleteScorecardWeek=deleteScor
 window.openIssueForm=openIssueForm;window.resolveIssue=resolveIssue;window.saveIssueFromModal=saveIssueFromModal;window.confirmResolveIssueFromModal=confirmResolveIssueFromModal;
 window.initCalendarRoutingEngine=initCalendarRoutingEngine;
 window.calPrev=calPrev;window.calNext=calNext;window.setPen=setPen;window.setEraser=setEraser;
-window.openTask=openTask;window.advanceTaskStatus=advanceTaskStatus;window.openEvent=openEvent;
+window.openTask=openTask;window.advanceTaskStatus=advanceTaskStatus;window.openEvent=openEvent;window.toggleTaskDone=toggleTaskDone;
 window.deleteTxn=deleteTxn;window.selectNote=selectNote;window.selectRecipe=selectRecipe;
 window.openRecipe=openRecipe;window.addRecipeToGrocery=addRecipeToGrocery;window.setMealPlan=setMealPlan;
 window.toggleGrocery=toggleGrocery;window.connectOrDisconnectGoogle=connectOrDisconnectGoogle;
