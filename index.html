@@ -346,7 +346,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.2 · 02/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.11.3 · 02/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -1073,19 +1073,21 @@ function applyMigrationGuards() {
   // in their saved data — zero out only categories that still exactly
   // match their OLD default, leaving anything actually customized
   // untouched. Runs every load but is a no-op once nothing matches.
-  (function fixPlaceholderBudgetAmounts(){
-    const oldDefaults={'Income':7925,'Mortgage & Rent':3424,'Auto Payment':637,'Debt':657,'Monthly Bill':791,'Auto Insurance':170,'Groceries':1024,'Shopping':150,'Gas':200,'Fast Food':60,'Restaurants':60,'Medicines':100,'Subscriptions':145,'Tithe':200,'Giving':25,'Julia Spending':40,'Entertainment':20,'Miscellaneous':75};
-    let changed=false;
-    (state.budgetCategories||[]).forEach(c=>{
-      if(Object.prototype.hasOwnProperty.call(oldDefaults,c.name)&&Number(c.planned)===oldDefaults[c.name]){
-        c.planned=0;changed=true;
-      }
-      if(c.name==='Julia Spending'){c.name='Spouse/Partner Spending';changed=true;}
-    });
-    // Persist immediately so this is a true one-time fix, not something
-    // that silently re-applies every load because it never got saved.
-    if(changed)saveStateToFirestore();
-  })();
+  try {
+    (function fixPlaceholderBudgetAmounts(){
+      const oldDefaults={'Income':7925,'Mortgage & Rent':3424,'Auto Payment':637,'Debt':657,'Monthly Bill':791,'Auto Insurance':170,'Groceries':1024,'Shopping':150,'Gas':200,'Fast Food':60,'Restaurants':60,'Medicines':100,'Subscriptions':145,'Tithe':200,'Giving':25,'Julia Spending':40,'Entertainment':20,'Miscellaneous':75};
+      let changed=false;
+      (state.budgetCategories||[]).forEach(c=>{
+        if(Object.prototype.hasOwnProperty.call(oldDefaults,c.name)&&Number(c.planned)===oldDefaults[c.name]){
+          c.planned=0;changed=true;
+        }
+        if(c.name==='Julia Spending'){c.name='Spouse/Partner Spending';changed=true;}
+      });
+      // Persist immediately so this is a true one-time fix, not something
+      // that silently re-applies every load because it never got saved.
+      if(changed)saveStateToFirestore();
+    })();
+  } catch(e) { console.error('fixPlaceholderBudgetAmounts failed (non-fatal):', e); }
   if (!state.goals) state.goals = [];
   if (!state.weeklyReviews) state.weeklyReviews = [];
   if (!state.rocks) state.rocks = [];
