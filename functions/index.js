@@ -285,19 +285,33 @@ exports.shareCalendarWith = functions.https.onCall(async (data, context) => {
   }
 
   const db = admin.firestore();
-  const userRef = db.collection('users').doc(context.auth.uid);
-  await userRef.set(
-    {
-      sharedCalendarViewers: admin.firestore.FieldValue.arrayUnion(targetUser.uid),
-      // Separate map (not part of the array) purely so the UI can show
-      // "shared with jason@..." without a reverse UID->email lookup —
-      // keeping it out of the array itself means arrayUnion/arrayRemove
-      // on sharedCalendarViewers stays simple exact-match-on-a-string,
-      // not fragile exact-match-on-an-object.
-      sharedCalendarViewerEmails: { [targetUser.uid]: email }
-    },
-    { merge: true }
-  );
+  const myEmail = (context.auth.token.email || '').toLowerCase();
+  const batch = db.batch();
+
+  const myRef = db.collection('users').doc(context.auth.uid);
+  batch.set(myRef, {
+    sharedCalendarViewers: admin.firestore.FieldValue.arrayUnion(targetUser.uid),
+    // Separate map (not part of the array) purely so the UI can show
+    // "shared with jason@..." without a reverse UID->email lookup —
+    // keeping it out of the array itself means arrayUnion/arrayRemove
+    // on sharedCalendarViewers stays simple exact-match-on-a-string,
+    // not fragile exact-match-on-an-object.
+    sharedCalendarViewerEmails: { [targetUser.uid]: email }
+  }, { merge: true });
+
+  // Reverse pointer on the VIEWER's own doc — without this, there's no
+  // way for the person who was just granted access to discover "whose
+  // calendars can I see" without an expensive/awkward cross-user query.
+  // Each person only ever reads their own doc to know who's shared
+  // with them, matching the security-conscious owned-data pattern used
+  // everywhere else here.
+  const targetRef = db.collection('users').doc(targetUser.uid);
+  batch.set(targetRef, {
+    sharedWithMe: admin.firestore.FieldValue.arrayUnion(context.auth.uid),
+    sharedWithMeEmails: { [context.auth.uid]: myEmail }
+  }, { merge: true });
+
+  await batch.commit();
   return { shared: true, targetUid: targetUser.uid, targetEmail: email };
 });
 
@@ -307,10 +321,15 @@ exports.unshareCalendarWith = functions.https.onCall(async (data, context) => {
   if (!targetUid) throw new functions.https.HttpsError('invalid-argument', 'Missing targetUid.');
 
   const db = admin.firestore();
-  const userRef = db.collection('users').doc(context.auth.uid);
-  await userRef.set(
-    { sharedCalendarViewers: admin.firestore.FieldValue.arrayRemove(targetUid) },
-    { merge: true }
-  );
+  const batch = db.batch();
+  batch.set(db.collection('users').doc(context.auth.uid), {
+    sharedCalendarViewers: admin.firestore.FieldValue.arrayRemove(targetUid)
+  }, { merge: true });
+  // Remove the matching reverse pointer too, or the target would keep
+  // seeing this person's calendar as available after being unshared.
+  batch.set(db.collection('users').doc(targetUid), {
+    sharedWithMe: admin.firestore.FieldValue.arrayRemove(context.auth.uid)
+  }, { merge: true });
+  await batch.commit();
   return { unshared: true };
 });
