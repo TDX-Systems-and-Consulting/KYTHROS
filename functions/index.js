@@ -261,3 +261,56 @@ exports.getUserCalendarEvents = functions.https.onCall(async (data, context) => 
 
   return { connected: true, events };
 });
+
+// shareCalendarWith / unshareCalendarWith (callable)
+// ────────────────────────────────────────────────────
+// Grants (or revokes) another PlannerXD user permission to read the
+// caller's calendar via getUserCalendarEvents above. Looked up by
+// email server-side (Admin SDK) rather than trusting a UID from the
+// client — the client never gets to just supply an arbitrary UID and
+// have it accepted as "this person."
+exports.shareCalendarWith = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in.');
+  const email = (data.email || '').trim().toLowerCase();
+  if (!email) throw new functions.https.HttpsError('invalid-argument', 'Missing email.');
+
+  let targetUser;
+  try {
+    targetUser = await admin.auth().getUserByEmail(email);
+  } catch (e) {
+    throw new functions.https.HttpsError('not-found', 'No PlannerXD account found for ' + email + '. They need to have signed into PlannerXD at least once first.');
+  }
+  if (targetUser.uid === context.auth.uid) {
+    throw new functions.https.HttpsError('invalid-argument', "You can't share your calendar with yourself.");
+  }
+
+  const db = admin.firestore();
+  const userRef = db.collection('users').doc(context.auth.uid);
+  await userRef.set(
+    {
+      sharedCalendarViewers: admin.firestore.FieldValue.arrayUnion(targetUser.uid),
+      // Separate map (not part of the array) purely so the UI can show
+      // "shared with jason@..." without a reverse UID->email lookup —
+      // keeping it out of the array itself means arrayUnion/arrayRemove
+      // on sharedCalendarViewers stays simple exact-match-on-a-string,
+      // not fragile exact-match-on-an-object.
+      sharedCalendarViewerEmails: { [targetUser.uid]: email }
+    },
+    { merge: true }
+  );
+  return { shared: true, targetUid: targetUser.uid, targetEmail: email };
+});
+
+exports.unshareCalendarWith = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in.');
+  const targetUid = data.targetUid;
+  if (!targetUid) throw new functions.https.HttpsError('invalid-argument', 'Missing targetUid.');
+
+  const db = admin.firestore();
+  const userRef = db.collection('users').doc(context.auth.uid);
+  await userRef.set(
+    { sharedCalendarViewers: admin.firestore.FieldValue.arrayRemove(targetUid) },
+    { merge: true }
+  );
+  return { unshared: true };
+});
