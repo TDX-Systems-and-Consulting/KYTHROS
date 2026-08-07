@@ -231,3 +231,43 @@ exports.getCalendarEventsForConnection = functions.https.onCall(async (data, con
 
   return { connected: true, events };
 });
+
+// pushEventToConnection (callable)
+// ────────────────────────────────────────
+// Creates a real event on ONE of the caller's own connections' primary
+// calendar (by id) — e.g. pushing an appointment onto Jason's actual
+// Google Calendar using the refresh token captured when he connected.
+// This works because gcalOAuthStart requests the full 'calendar' scope
+// (not readonly), so every existing connection already has write
+// permission — no re-consent needed from the connected person.
+exports.pushEventToConnection = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in.');
+  const connectionId = data.connectionId;
+  const event = data.event;
+  if (!connectionId || !event || !event.title || !event.date) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing connectionId or event (title, date required).');
+  }
+
+  const cal = await getCalendarClientForConnection(context.auth.uid, connectionId);
+  if (!cal) throw new functions.https.HttpsError('not-found', 'Calendar connection not found.');
+
+  const tz = event.timeZone || 'America/Chicago';
+  const resource = event.startTime
+    ? {
+        summary: event.title,
+        description: event.notes || '',
+        location: event.location || '',
+        start: { dateTime: `${event.date}T${event.startTime}:00`, timeZone: tz },
+        end: { dateTime: `${event.date}T${event.endTime || event.startTime}:00`, timeZone: tz }
+      }
+    : {
+        summary: event.title,
+        description: event.notes || '',
+        location: event.location || '',
+        start: { date: event.date },
+        end: { date: event.date }
+      };
+
+  const resp = await cal.events.insert({ calendarId: 'primary', resource });
+  return { success: true, eventId: resp.data.id };
+});

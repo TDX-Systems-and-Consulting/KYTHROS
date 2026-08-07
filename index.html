@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.15.1 · 07/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.16.0 · 07/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -2721,6 +2721,8 @@ async function saveEvent(){
     const calIds=getSelectedEventCalendars();
     for(const calId of calIds){try{await pushEventToGoogleCalendar(event,calId);}catch(e){console.warn('Cal push failed for',calId,e);}}
   }
+  const connIds=getSelectedEventConnections();
+  for(const connId of connIds){try{await pushEventToConnectionCalendar(event,connId);}catch(e){console.warn('Connection push failed for',connId,e);}}
   renderCalendar();renderDashboard();
 }
 async function deleteEvent(){
@@ -5669,6 +5671,25 @@ function getSelectedEventCalendars(){
   });
   return ids;
 }
+// Connection-based push targets (e.g. Jason) are separate from
+// getSelectedEventCalendars() above — those go through the client-side
+// gapi session (only works for calendars YOUR Google account can write
+// to), while connections push server-side using each person's own
+// stored refresh token via the pushEventToConnection function.
+function getSelectedEventConnections(){
+  const ids=[];
+  (calConnections||[]).forEach(c=>{
+    if(/^my calendar$/i.test(c.label||''))return; // that one's covered by evCalPrimary/gapi already
+    const cb=document.getElementById('evConn_'+c.id);
+    if(cb&&cb.checked)ids.push(c.id);
+  });
+  return ids;
+}
+async function pushEventToConnectionCalendar(event,connectionId){
+  if(!_fbFunctions)return;
+  const fn=_fbFunctions.httpsCallable('pushEventToConnection');
+  await fn({connectionId,event:{title:event.title,date:event.date,startTime:event.startTime,endTime:event.endTime,location:event.location,notes:event.notes,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}});
+}
 async function pushEventToGoogleCalendar(event,calendarId){
   const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
   if(!event.startTime){
@@ -5685,7 +5706,8 @@ function buildEventCalendarCheckboxes(){
   let html=`<div class="full" style="background:rgba(77,141,255,.07);border:1px solid rgba(77,141,255,.15);border-radius:12px;padding:12px 14px"><div style="font-size:.82rem;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">Push to Google Calendar</div>`;
   html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evCalPrimary" checked style="width:16px;height:16px"><span style="font-size:.88rem">My Calendar</span></label>`;
   family.forEach((fc,i)=>{html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evCal_${i}" checked style="width:16px;height:16px"><span style="font-size:.88rem">${esc(fc.name)}</span></label>`;});
-  if(!family.length)html+=`<div style="font-size:.76rem;color:rgba(110,145,210,.4);margin-top:2px">Add family calendars in Set Profile to share events with family.</div>`;
+  (calConnections||[]).filter(c=>!/^my calendar$/i.test(c.label||'')).forEach(c=>{html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evConn_${c.id}" style="width:16px;height:16px"><span style="font-size:.88rem">${esc(c.label)}</span></label>`;});
+  if(!family.length&&(calConnections||[]).filter(c=>!/^my calendar$/i.test(c.label||'')).length===0)html+=`<div style="font-size:.76rem;color:rgba(110,145,210,.4);margin-top:2px">Add family calendars in Set Profile to share events with family.</div>`;
   html+=`</div>`;
   return html;
 }
