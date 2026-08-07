@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.14.0 · 05/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.15.0 · 07/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -511,6 +511,28 @@
             <button class="btn" id="driveSyncBtn" onclick="manualDriveSync()">Sync Drive</button>
             <button class="btn" id="syncTasksBtn" onclick="syncTaskDueDatesToGoogle(true)">Sync Tasks</button>
             <button class="btn btn-primary" id="addEventBtn" onclick="newEvent()">+ Add Event</button>
+          </div>
+        </div>
+        <!-- ══ SHARED CALENDAR (server-side, per-person) ══ -->
+        <!-- Separate from the personal "Connect Google Calendar" button
+             above — that one is per-browser and only ever shows YOUR
+             OWN events to YOU. This connection is server-side, so it's
+             the one that can eventually be read by someone else you've
+             explicitly approved (or by JOBSMETRIX, for schedule
+             conflict checking). Two independent connections on purpose. -->
+        <div class="card-body" style="padding-top:0;border-top:1px solid var(--line);margin-top:4px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0">
+            <span style="font-weight:700;font-size:.85rem">🔗 Shared Calendar</span>
+            <span id="sharedGcalStatusBadge" class="status-badge status-bad">Not Connected</span>
+            <button class="btn" id="sharedGcalConnectBtn" onclick="connectSharedGoogleCalendar()">Connect (Shared)</button>
+          </div>
+          <div class="small muted" style="margin-bottom:10px">Lets someone you approve — or JOBSMETRIX, for schedule conflict checking — see your real calendar. Separate from the personal connection above, which only you can ever see.</div>
+          <div id="sharedCalSharingPanel" style="display:none">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+              <input id="sharedCalShareEmail" type="email" placeholder="their-email@example.com" style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(var(--surface2-rgb),.6);color:var(--text)" />
+              <button class="btn btn-primary" onclick="shareMyCalendarWith()">Share with them</button>
+            </div>
+            <div id="sharedCalViewersList" class="small muted">Loading who you've shared with…</div>
           </div>
         </div>
         <div class="card-body">
@@ -791,6 +813,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 
 <!-- ══ DISPLAY MODE OVERLAY ══ -->
 <div class="display-overlay" id="displayOverlay" onclick="exitDisplayMode()">
@@ -955,13 +978,14 @@ const FIREBASE_CONFIG = {
 };
 const ADMIN_EMAIL = 'travis@jtxdgroup.com';
 const ADMIN_EMAILS = ['travis@jtxdgroup.com', 'travis@7pillarsgroup.org', 'travisdurbin73@gmail.com', 'Juliad42017@gmail.com'];
-let _fbApp, _fbAuth, _fbDb, _currentUser = null, _firestoreReady = false;
+let _fbApp, _fbAuth, _fbDb, _fbFunctions, _currentUser = null, _firestoreReady = false;
 
 function initFirebase() {
   try {
     _fbApp = firebase.initializeApp(FIREBASE_CONFIG);
     _fbAuth = firebase.auth();
     _fbDb = firebase.firestore();
+    _fbFunctions = firebase.functions();
     _firestoreReady = true;
 
     // ── Offline persistence ──────────────────────────────────────────
@@ -1528,6 +1552,7 @@ function eventColor(ev){
   const k=streamKeyFor(ev);
   if(k)return _STREAM_COLORS[k];
   if(ev&&ev.source==='gcal')return getCalColor(ev._calId||'',ev._calName||'');
+  if(ev&&ev.source==='shared')return getSharedPersonColor(ev._personUid||'',ev._personLabel||'');
   return projectColor((ev&&(ev._project||ev.location))||'');
 }
 function chipStyle(col){return`background:${col}22;border:1px solid ${col}55;color:${col};`;}
@@ -1870,6 +1895,26 @@ function loadCalColors(){try{return JSON.parse(localStorage.getItem('kythros_cal
 function saveCalColors(obj){localStorage.setItem('kythros_cal_colors',JSON.stringify(obj))}
 function getCalColor(calId,calName){const c=loadCalColors();return c[calId]||projectColor(calName||calId);}
 function setCalColor(calId,color){const c=loadCalColors();c[calId]=color;saveCalColors(c);renderCalendarSidebar();renderCalendar();}
+
+// Same pattern, for OTHER people's shared calendars (Jason's, etc) —
+// keyed by their uid rather than a Google calendar id. Defaults to
+// --blue (the theme's own blue) for the first person shared with you,
+// since that matches what was actually asked for ("him as blue") —
+// manually adjustable per-person the same way Google calendar colors
+// already are, via setSharedPersonColor.
+function loadSharedPersonColors(){try{return JSON.parse(localStorage.getItem('kythros_shared_person_colors')||'{}')}catch{return{}}}
+function saveSharedPersonColors(obj){localStorage.setItem('kythros_shared_person_colors',JSON.stringify(obj))}
+function getSharedPersonColor(uid,label){
+  const c=loadSharedPersonColors();
+  if(c[uid])return c[uid];
+  // First-time default: --blue for the first person, then fall back to
+  // the deterministic project-style palette for anyone after that, so
+  // multiple shared people are still visually distinct without every
+  // single one needing a manual color pick first.
+  const known=Object.keys(c);
+  return known.length===0?'#4d8dff':projectColor(label||uid);
+}
+function setSharedPersonColor(uid,color){const c=loadSharedPersonColors();c[uid]=color;saveSharedPersonColors(c);renderCalendarSidebar();renderCalendar();}
 function toggleCalVisibility(calId){const h=loadHiddenCals();if(h.has(calId))h.delete(calId);else h.add(calId);saveHiddenCals(h);renderCalendarSidebar();renderCalendar();}
 function renderCalendarSidebar(){
   const el=document.getElementById('calendarSidebar');if(!el)return;
@@ -2029,6 +2074,172 @@ async function manualDriveSync(){
 function hasGoogleToken(){try{return !!(window.gapi&&gapi.client&&gapi.client.getToken&&gapi.client.getToken()&&gapi.client.getToken().access_token)}catch{return false}}
 function markGoogleConnected(){gcalState.connected=true;gcalState.lastSync=new Date().toISOString();saveGcalState();renderGcalStatus()}
 function markGoogleDisconnected(){gcalState.connected=false;gcalState.lastSync='';saveGcalState();localStorage.removeItem('kythros_gcal_token');localStorage.removeItem('kythros_gcal_expiry');localStorage.removeItem('kythros_drive_file_id');gdriveFileId=null;renderGcalStatus();}
+
+// ── Shared Calendar (server-side, per-person) ──────────────────────
+// Separate connection from the personal client-side one above. That
+// one only ever shows YOU your own events, in YOUR browser. This one
+// is server-side (Cloud Functions + a refresh token stored in
+// Firestore, never sent to the client), so it's the connection that
+// can eventually be read by someone else you've approved, or by
+// JOBSMETRIX for schedule conflict checking.
+const PLANNERXD_FUNCTIONS_BASE = 'https://us-central1-plannerxd.cloudfunctions.net';
+
+async function connectSharedGoogleCalendar() {
+  if (!_currentUser) { alert('Please sign in first.'); return; }
+  const btn = document.getElementById('sharedGcalConnectBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Connecting…'; }
+  try {
+    const idToken = await _currentUser.getIdToken();
+    // Full-page redirect (not a popup) — matches how gcalOAuthStart is
+    // built server-side (it redirects straight to Google, no JSON
+    // response to catch). Opens in the same tab; the callback page
+    // tells the user to close it and come back.
+    window.open(`${PLANNERXD_FUNCTIONS_BASE}/gcalOAuthStart?token=${encodeURIComponent(idToken)}`, '_blank');
+  } catch (e) {
+    alert('Could not start connection: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Connect (Shared)'; }
+  }
+}
+window.connectSharedGoogleCalendar = connectSharedGoogleCalendar;
+
+async function disconnectSharedGoogleCalendar() {
+  if (!_fbFunctions || !confirm('Disconnect your shared calendar? Anyone you\'ve shared it with will lose access.')) return;
+  try {
+    await _fbFunctions.httpsCallable('gcalSharedDisconnect')();
+    renderSharedCalStatus();
+  } catch (e) {
+    alert('Error disconnecting: ' + e.message);
+  }
+}
+window.disconnectSharedGoogleCalendar = disconnectSharedGoogleCalendar;
+
+// Checks connection status directly from the user's own doc (the
+// plain boolean flag — never the token itself) and shows/hides the
+// sharing panel accordingly. Call this whenever the Calendar page is
+// shown, same as the existing personal-connection status check.
+let sharedCalEvents = [];
+let _sharedCalLoading = false;
+
+async function renderSharedCalStatus() {
+  const badge = document.getElementById('sharedGcalStatusBadge');
+  const btn = document.getElementById('sharedGcalConnectBtn');
+  const panel = document.getElementById('sharedCalSharingPanel');
+  if (!badge || !_fbDb || !_currentUser) return;
+  try {
+    const doc = await _fbDb.collection('users').doc(_currentUser.uid).get();
+    const connected = !!(doc.exists && doc.data().googleCalendarSharedConnected);
+    badge.textContent = connected ? '✅ Connected' : 'Not Connected';
+    badge.className = 'status-badge ' + (connected ? 'status-ok' : 'status-bad');
+    if (btn) {
+      btn.textContent = connected ? 'Disconnect (Shared)' : 'Connect (Shared)';
+      btn.onclick = connected ? disconnectSharedGoogleCalendar : connectSharedGoogleCalendar;
+    }
+    if (panel) panel.style.display = connected ? '' : 'none';
+    if (connected) renderSharedCalViewersList(doc.data());
+    // Loading OTHER people's events depends on who's shared WITH the
+    // current user (sharedWithMe), not on whether the current user's
+    // OWN shared connection is on — those are independent. Reuses the
+    // doc read above rather than a second Firestore round-trip.
+    loadSharedCalEvents(doc.exists ? doc.data() : {});
+  } catch (e) {
+    console.warn('Could not load shared calendar status:', e.message);
+  }
+}
+window.renderSharedCalStatus = renderSharedCalStatus;
+
+// Fetches real Google Calendar events for everyone who's shared their
+// calendar with the current user, via the server-side
+// getUserCalendarEvents callable (never touches anyone's raw token —
+// the Cloud Function does that, using the refresh token it already
+// has stored). Same visible date range as allCalendarEvents() uses
+// for its own local/task events, so everything lines up on one grid.
+async function loadSharedCalEvents(userData) {
+  if (_sharedCalLoading || !_fbFunctions) return;
+  const sharedWithMe = userData?.sharedWithMe || [];
+  const emails = userData?.sharedWithMeEmails || {};
+  if (!sharedWithMe.length) { sharedCalEvents = []; renderCalendar(); return; }
+
+  _sharedCalLoading = true;
+  try {
+    const today = new Date();
+    const timeMin = new Date(today.getFullYear(), today.getMonth() - 2, 1).toISOString();
+    const timeMax = new Date(today.getFullYear(), today.getMonth() + 4, 0).toISOString();
+    const getEvents = _fbFunctions.httpsCallable('getUserCalendarEvents');
+
+    const results = await Promise.all(sharedWithMe.map(uid =>
+      getEvents({ targetUid: uid, timeMin, timeMax })
+        .then(r => ({ uid, label: emails[uid] || uid, data: r.data }))
+        .catch(e => { console.warn('Could not load shared events for', uid, ':', e.message); return { uid, label: emails[uid] || uid, data: { connected: false, events: [] } }; })
+    ));
+
+    const merged = [];
+    results.forEach(({ uid, label, data }) => {
+      if (!data.connected) return; // they haven't connected their OWN shared calendar yet — nothing to show
+      (data.events || []).forEach(ev => {
+        merged.push({
+          id: `shared-${uid}-${ev.id}`,
+          title: ev.title,
+          date: (ev.start || '').slice(0, 10),
+          startTime: ev.allDay ? '' : (ev.start || '').slice(11, 16),
+          endTime: ev.allDay ? '' : (ev.end || '').slice(11, 16),
+          location: ev.location || '',
+          notes: label,
+          source: 'shared',
+          _personUid: uid,
+          _personLabel: label
+        });
+      });
+    });
+    sharedCalEvents = merged;
+    renderCalendar();
+  } finally {
+    _sharedCalLoading = false;
+  }
+}
+window.loadSharedCalEvents = loadSharedCalEvents;
+
+async function shareMyCalendarWith() {
+  const input = document.getElementById('sharedCalShareEmail');
+  const email = (input?.value || '').trim();
+  if (!email) return;
+  if (!_fbFunctions) { alert('Not ready yet — try again in a moment.'); return; }
+  try {
+    await _fbFunctions.httpsCallable('shareCalendarWith')({ email });
+    input.value = '';
+    const doc = await _fbDb.collection('users').doc(_currentUser.uid).get();
+    renderSharedCalViewersList(doc.data());
+  } catch (e) {
+    alert('Could not share: ' + (e.message || e));
+  }
+}
+window.shareMyCalendarWith = shareMyCalendarWith;
+
+async function unshareMyCalendarWith(targetUid) {
+  if (!_fbFunctions || !confirm('Remove this person\'s access to your calendar?')) return;
+  try {
+    await _fbFunctions.httpsCallable('unshareCalendarWith')({ targetUid });
+    const doc = await _fbDb.collection('users').doc(_currentUser.uid).get();
+    renderSharedCalViewersList(doc.data());
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+window.unshareMyCalendarWith = unshareMyCalendarWith;
+
+function renderSharedCalViewersList(userData) {
+  const list = document.getElementById('sharedCalViewersList');
+  if (!list) return;
+  const viewers = userData?.sharedCalendarViewers || [];
+  const emails = userData?.sharedCalendarViewerEmails || {};
+  if (!viewers.length) { list.innerHTML = 'Not shared with anyone yet.'; return; }
+  list.innerHTML = 'Shared with: ' + viewers.map(uid => `
+    <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(var(--surface2-rgb),.6);border:1px solid var(--line);border-radius:10px;padding:4px 10px;margin:2px 4px 2px 0">
+      ${wEsc(emails[uid] || uid)}
+      <button onclick="unshareMyCalendarWith('${uid}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:0;font-size:.9rem">✕</button>
+    </span>`).join('');
+}
+
 
 function priorityClass(p){return`p-${(p||'').toLowerCase()}`}
 function statusClass(s){return s==='Blocked'?'s-blocked':s==='In Progress'?'s-progress':s==='Done'?'s-done':'s-todo'}
@@ -2306,7 +2517,8 @@ function allCalendarEvents(){
   // Dedup: hide "Busy" events when a real named event exists at same date+time
   const realKeys=new Set(googleEvents.filter(e=>e.title!=='Busy').map(e=>e.date+'|'+(e.startTime||'')));
   googleEvents=googleEvents.filter(e=>e.title!=='Busy'||!realKeys.has(e.date+'|'+(e.startTime||'')));
-  return [...localExpanded,...taskEvents,...googleEvents];
+  const sharedInRange=(sharedCalEvents||[]).filter(e=>e.date>=rangeStart&&e.date<=rangeEnd);
+  return [...localExpanded,...taskEvents,...googleEvents,...sharedInRange];
 }
 
 function calendarEventChipClass(ev){
@@ -2319,7 +2531,7 @@ function calendarEventChipClass(ev){
   return '';
 }
 
-function openEvent(id,source){const ev=allCalendarEvents().find(e=>e.id===id&&e.source===source);if(!ev)return;document.getElementById('eventId').value=ev.id;document.getElementById('eventSource').value=source;document.getElementById('eventCalId').value=ev._calId||'primary';document.getElementById('eventTitle').value=ev.title.startsWith('Due: ')?ev.title.replace(/^Due: /,''):ev.title;document.getElementById('eventDate').value=ev.date||'';document.getElementById('eventLocation').value=ev.location||'';document.getElementById('eventStartTime').value=ev.startTime||'';document.getElementById('eventEndTime').value=ev.endTime||'';document.getElementById('eventRepeat').value=ev.repeat||'';document.getElementById('eventNotes').value=ev.notes||'';document.getElementById('eventModalTitle').textContent=source==='task'?'Task Due Date':'Event';document.getElementById('deleteEventBtn').style.display=source==='task'?'none':'inline-flex';document.getElementById('saveEventBtn').style.display=source==='gcal'?'none':'inline-flex';updateMapsBtn();document.getElementById('eventModal').style.display='flex'}
+function openEvent(id,source){const ev=allCalendarEvents().find(e=>e.id===id&&e.source===source);if(!ev)return;document.getElementById('eventId').value=ev.id;document.getElementById('eventSource').value=source;document.getElementById('eventCalId').value=ev._calId||'primary';document.getElementById('eventTitle').value=ev.title.startsWith('Due: ')?ev.title.replace(/^Due: /,''):ev.title;document.getElementById('eventDate').value=ev.date||'';document.getElementById('eventLocation').value=ev.location||'';document.getElementById('eventStartTime').value=ev.startTime||'';document.getElementById('eventEndTime').value=ev.endTime||'';document.getElementById('eventRepeat').value=ev.repeat||'';document.getElementById('eventNotes').value=ev.notes||'';document.getElementById('eventModalTitle').textContent=source==='task'?'Task Due Date':(source==='shared'?`${ev._personLabel||'Shared'}'s Event (read-only)`:'Event');document.getElementById('deleteEventBtn').style.display=(source==='task'||source==='shared')?'none':'inline-flex';document.getElementById('saveEventBtn').style.display=(source==='gcal'||source==='shared')?'none':'inline-flex';updateMapsBtn();document.getElementById('eventModal').style.display='flex'}
 function setEventType(type){
   document.getElementById('eventType').value=type;
   const apptBtn=document.getElementById('evTypeAppt');
@@ -4858,6 +5070,7 @@ function renderAll(){
     ['renderNotesList',()=>{renderNotesList();loadSelectedNoteIntoEditor();}],
     ['renderRecipes',()=>renderRecipes()],
     ['renderGcalStatus',()=>renderGcalStatus()],
+    ['renderSharedCalStatus',()=>renderSharedCalStatus()],
     ['renderTimeline',()=>renderTimeline()],
     ['renderFamilyPage',()=>renderFamilyPage()],
     ['renderGoals',()=>renderGoals()],
@@ -6583,7 +6796,6 @@ function renderWToday() {
           <span style="font-size:13px;font-weight:700">Do First</span>
           <span style="font-size:10px;color:rgba(110,145,210,.5)">Urgent · Important</span>
         </div>
-        
       </div>
       ${doFirst.map(t => `
         <div class="w-task ${t.done?'done':''}">
