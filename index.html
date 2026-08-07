@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.17.0 · 07/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.17.1 · 07/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -2186,7 +2186,8 @@ async function loadSharedCalEvents() {
           notes: label,
           source: 'shared',
           _personUid: id,
-          _personLabel: label
+          _personLabel: label,
+          _googleEventId: ev.id
         });
       });
     });
@@ -2483,7 +2484,15 @@ function allCalendarEvents(){
   const realKeys=new Set(googleEvents.filter(e=>e.title!=='Busy').map(e=>e.date+'|'+(e.startTime||'')));
   googleEvents=googleEvents.filter(e=>e.title!=='Busy'||!realKeys.has(e.date+'|'+(e.startTime||'')));
   const sharedInRange=(sharedCalEvents||[]).filter(e=>e.date>=rangeStart&&e.date<=rangeEnd);
-  return [...localExpanded,...taskEvents,...googleEvents,...sharedInRange];
+  // Dedup: hide any pulled "shared" event that is really just the
+  // Google-side echo of an event WE pushed there (tracked via
+  // event.pushedTo[connectionId]=googleEventId). Otherwise a pushed
+  // appointment shows up twice — once as the editable local copy, once
+  // as a read-only shared copy pulled back on the next poll.
+  const pushedPairs=new Set();
+  (state.events||[]).forEach(ev=>{if(ev.pushedTo)Object.keys(ev.pushedTo).forEach(cid=>pushedPairs.add(cid+'|'+ev.pushedTo[cid]));});
+  const sharedDeduped=sharedInRange.filter(e=>!pushedPairs.has((e._personUid||'')+'|'+(e._googleEventId||'')));
+  return [...localExpanded,...taskEvents,...googleEvents,...sharedDeduped];
 }
 
 function calendarEventChipClass(ev){
