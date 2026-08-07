@@ -271,3 +271,77 @@ exports.pushEventToConnection = functions.https.onCall(async (data, context) => 
   const resp = await cal.events.insert({ calendarId: 'primary', resource });
   return { success: true, eventId: resp.data.id };
 });
+
+// updateEventOnConnection (callable)
+// ────────────────────────────────────────
+// Updates an event that was previously pushed to a connection's
+// calendar (by the Google event id returned from pushEventToConnection).
+// Called when a PlannerXD event that's already been pushed gets edited,
+// so the connection's calendar reflects the change instead of getting
+// a duplicate.
+exports.updateEventOnConnection = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in.');
+  const connectionId = data.connectionId;
+  const googleEventId = data.googleEventId;
+  const event = data.event;
+  if (!connectionId || !googleEventId || !event || !event.title || !event.date) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing connectionId, googleEventId, or event.');
+  }
+
+  const cal = await getCalendarClientForConnection(context.auth.uid, connectionId);
+  if (!cal) throw new functions.https.HttpsError('not-found', 'Calendar connection not found.');
+
+  const tz = event.timeZone || 'America/Chicago';
+  const resource = event.startTime
+    ? {
+        summary: event.title,
+        description: event.notes || '',
+        location: event.location || '',
+        start: { dateTime: `${event.date}T${event.startTime}:00`, timeZone: tz },
+        end: { dateTime: `${event.date}T${event.endTime || event.startTime}:00`, timeZone: tz }
+      }
+    : {
+        summary: event.title,
+        description: event.notes || '',
+        location: event.location || '',
+        start: { date: event.date },
+        end: { date: event.date }
+      };
+
+  try {
+    await cal.events.update({ calendarId: 'primary', eventId: googleEventId, resource });
+    return { success: true, eventId: googleEventId };
+  } catch (e) {
+    // The event may have been deleted or moved on the Google side since
+    // we last touched it — fall back to creating a fresh one rather than
+    // silently failing, so the edit still lands somewhere.
+    if (e.code === 404 || e.code === 410) {
+      const resp = await cal.events.insert({ calendarId: 'primary', resource });
+      return { success: true, eventId: resp.data.id, recreated: true };
+    }
+    throw e;
+  }
+});
+
+// deleteEventOnConnection (callable)
+// ────────────────────────────────────────
+// Deletes an event previously pushed to a connection's calendar.
+exports.deleteEventOnConnection = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in.');
+  const connectionId = data.connectionId;
+  const googleEventId = data.googleEventId;
+  if (!connectionId || !googleEventId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing connectionId or googleEventId.');
+  }
+
+  const cal = await getCalendarClientForConnection(context.auth.uid, connectionId);
+  if (!cal) throw new functions.https.HttpsError('not-found', 'Calendar connection not found.');
+
+  try {
+    await cal.events.delete({ calendarId: 'primary', eventId: googleEventId });
+  } catch (e) {
+    // Already gone on the Google side — treat as success either way.
+    if (e.code !== 404 && e.code !== 410) throw e;
+  }
+  return { success: true };
+});

@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.16.0 · 07/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.17.0 · 07/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -2197,6 +2197,13 @@ async function loadSharedCalEvents() {
   }
 }
 window.loadSharedCalEvents = loadSharedCalEvents;
+// Poll every 60s so events Jason adds/edits directly on his own Google
+// Calendar show up in PlannerXD without Travis needing to reload the
+// page — real near-live sync without needing Google's push-notification
+// webhook infrastructure (channel registration + 7-day renewal cron),
+// which is overkill and one more thing to silently break for a
+// two-person setup like this.
+setInterval(function(){ if(calConnections.length) loadSharedCalEvents(); }, 60000);
 
 
 function priorityClass(p){return`p-${(p||'').toLowerCase()}`}
@@ -2489,7 +2496,7 @@ function calendarEventChipClass(ev){
   return '';
 }
 
-function openEvent(id,source){const ev=allCalendarEvents().find(e=>e.id===id&&e.source===source);if(!ev)return;document.getElementById('eventId').value=ev.id;document.getElementById('eventSource').value=source;document.getElementById('eventCalId').value=ev._calId||'primary';document.getElementById('eventTitle').value=ev.title.startsWith('Due: ')?ev.title.replace(/^Due: /,''):ev.title;document.getElementById('eventDate').value=ev.date||'';document.getElementById('eventLocation').value=ev.location||'';document.getElementById('eventStartTime').value=ev.startTime||'';document.getElementById('eventEndTime').value=ev.endTime||'';document.getElementById('eventRepeat').value=ev.repeat||'';document.getElementById('eventNotes').value=ev.notes||'';document.getElementById('eventModalTitle').textContent=source==='task'?'Task Due Date':(source==='shared'?`${ev._personLabel||'Shared'}'s Event (read-only)`:'Event');document.getElementById('deleteEventBtn').style.display=(source==='task'||source==='shared')?'none':'inline-flex';document.getElementById('saveEventBtn').style.display=(source==='gcal'||source==='shared')?'none':'inline-flex';updateMapsBtn();document.getElementById('eventModal').style.display='flex'}
+function openEvent(id,source){const ev=allCalendarEvents().find(e=>e.id===id&&e.source===source);if(!ev)return;document.getElementById('eventId').value=ev.id;document.getElementById('eventSource').value=source;document.getElementById('eventCalId').value=ev._calId||'primary';document.getElementById('eventTitle').value=ev.title.startsWith('Due: ')?ev.title.replace(/^Due: /,''):ev.title;document.getElementById('eventDate').value=ev.date||'';document.getElementById('eventLocation').value=ev.location||'';document.getElementById('eventStartTime').value=ev.startTime||'';document.getElementById('eventEndTime').value=ev.endTime||'';document.getElementById('eventRepeat').value=ev.repeat||'';document.getElementById('eventNotes').value=ev.notes||'';document.getElementById('eventModalTitle').textContent=source==='task'?'Task Due Date':(source==='shared'?`${ev._personLabel||'Shared'}'s Event (read-only)`:'Event');document.getElementById('deleteEventBtn').style.display=(source==='task'||source==='shared')?'none':'inline-flex';document.getElementById('saveEventBtn').style.display=(source==='gcal'||source==='shared')?'none':'inline-flex';updateMapsBtn();const calBox=document.getElementById('eventCalendarPush');if(calBox)calBox.innerHTML=source==='local'?buildEventCalendarCheckboxes(state.events.find(e=>e.id===id)):'';document.getElementById('eventModal').style.display='flex'}
 function setEventType(type){
   document.getElementById('eventType').value=type;
   const apptBtn=document.getElementById('evTypeAppt');
@@ -2715,14 +2722,13 @@ async function saveEvent(){
   // ── Appointment ──
   const event={id:document.getElementById('eventId').value||uid('evt'),title:document.getElementById('eventTitle').value.trim()||'Untitled event',date:document.getElementById('eventDate').value||todayISO(),startTime:document.getElementById('eventStartTime').value||'',endTime:document.getElementById('eventEndTime').value||'',location:document.getElementById('eventLocation').value.trim(),notes:document.getElementById('eventNotes').value.trim(),repeat:document.getElementById('eventRepeat').value||''};
   const idx=state.events.findIndex(e=>e.id===event.id);
-  if(idx>=0)state.events[idx]=event;else state.events.push(event);
+  if(idx>=0){event.pushedTo=state.events[idx].pushedTo||{};state.events[idx]=event;}else state.events.push(event);
   saveState();kClose('eventModal');
   if(gcalState.connected||hasGoogleToken()){
     const calIds=getSelectedEventCalendars();
     for(const calId of calIds){try{await pushEventToGoogleCalendar(event,calId);}catch(e){console.warn('Cal push failed for',calId,e);}}
   }
-  const connIds=getSelectedEventConnections();
-  for(const connId of connIds){try{await pushEventToConnectionCalendar(event,connId);}catch(e){console.warn('Connection push failed for',connId,e);}}
+  await syncEventToConnections(event);
   renderCalendar();renderDashboard();
 }
 async function deleteEvent(){
@@ -2740,6 +2746,12 @@ async function deleteEvent(){
     }
     gcalEvents=(gcalEvents||[]).filter(e=>e.id!==id);
     kClose('eventModal');renderCalendar();renderDashboard();return;
+  }
+  const target=state.events.find(e=>e.id===id);
+  if(target&&target.pushedTo){
+    for(const connId of Object.keys(target.pushedTo)){
+      try{await deleteEventOnConnectionCalendar(connId,target.pushedTo[connId]);}catch(e){console.warn('Connection delete failed for',connId,e);}
+    }
   }
   state.events=state.events.filter(e=>e.id!==id);
   saveState();kClose('eventModal');
@@ -5688,7 +5700,47 @@ function getSelectedEventConnections(){
 async function pushEventToConnectionCalendar(event,connectionId){
   if(!_fbFunctions)return;
   const fn=_fbFunctions.httpsCallable('pushEventToConnection');
-  await fn({connectionId,event:{title:event.title,date:event.date,startTime:event.startTime,endTime:event.endTime,location:event.location,notes:event.notes,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}});
+  const payload={title:event.title,date:event.date,startTime:event.startTime,endTime:event.endTime,location:event.location,notes:event.notes,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone};
+  const result=await fn({connectionId,event:payload});
+  return result.data.eventId;
+}
+async function updateEventOnConnectionCalendar(event,connectionId,googleEventId){
+  if(!_fbFunctions)return null;
+  const fn=_fbFunctions.httpsCallable('updateEventOnConnection');
+  const payload={title:event.title,date:event.date,startTime:event.startTime,endTime:event.endTime,location:event.location,notes:event.notes,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone};
+  const result=await fn({connectionId,googleEventId,event:payload});
+  return result.data.eventId;
+}
+async function deleteEventOnConnectionCalendar(connectionId,googleEventId){
+  if(!_fbFunctions)return;
+  const fn=_fbFunctions.httpsCallable('deleteEventOnConnection');
+  await fn({connectionId,googleEventId});
+}
+// Pushes/updates an event on every connection the user has checked for
+// this event, keeping event.pushedTo = {connectionId: googleEventId} in
+// sync so future edits update the SAME Google event instead of creating
+// duplicates, and deletes know exactly what to remove on the other side.
+async function syncEventToConnections(event){
+  const selected=getSelectedEventConnections();
+  event.pushedTo=event.pushedTo||{};
+  const allTargets=new Set([...selected,...Object.keys(event.pushedTo)]);
+  for(const connId of allTargets){
+    try{
+      if(!selected.includes(connId)){
+        // Was pushed before, now unchecked — remove it from that calendar.
+        if(event.pushedTo[connId]){await deleteEventOnConnectionCalendar(connId,event.pushedTo[connId]);delete event.pushedTo[connId];}
+        continue;
+      }
+      if(event.pushedTo[connId]){
+        const newId=await updateEventOnConnectionCalendar(event,connId,event.pushedTo[connId]);
+        if(newId)event.pushedTo[connId]=newId;
+      } else {
+        const newId=await pushEventToConnectionCalendar(event,connId);
+        if(newId)event.pushedTo[connId]=newId;
+      }
+    }catch(e){console.warn('Connection sync failed for',connId,e);}
+  }
+  saveState();
 }
 async function pushEventToGoogleCalendar(event,calendarId){
   const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -5698,15 +5750,16 @@ async function pushEventToGoogleCalendar(event,calendarId){
     await gapi.client.calendar.events.insert({calendarId,resource:{summary:event.title,description:event.notes||'',location:event.location||'',start:{dateTime:`${event.date}T${event.startTime}:00`,timeZone:tz},end:{dateTime:`${event.date}T${event.endTime||event.startTime}:00`,timeZone:tz}}});
   }
 }
-function buildEventCalendarCheckboxes(){
+function buildEventCalendarCheckboxes(existingEvent){
   const p=loadUserProfile();
   const family=((p&&p.familyCalendars)||[]);
   const connected=gcalState.connected||hasGoogleToken();
   if(!connected)return'';
+  const pushedTo=(existingEvent&&existingEvent.pushedTo)||{};
   let html=`<div class="full" style="background:rgba(77,141,255,.07);border:1px solid rgba(77,141,255,.15);border-radius:12px;padding:12px 14px"><div style="font-size:.82rem;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">Push to Google Calendar</div>`;
   html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evCalPrimary" checked style="width:16px;height:16px"><span style="font-size:.88rem">My Calendar</span></label>`;
   family.forEach((fc,i)=>{html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evCal_${i}" checked style="width:16px;height:16px"><span style="font-size:.88rem">${esc(fc.name)}</span></label>`;});
-  (calConnections||[]).filter(c=>!/^my calendar$/i.test(c.label||'')).forEach(c=>{html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evConn_${c.id}" style="width:16px;height:16px"><span style="font-size:.88rem">${esc(c.label)}</span></label>`;});
+  (calConnections||[]).filter(c=>!/^my calendar$/i.test(c.label||'')).forEach(c=>{const checked=pushedTo[c.id]?'checked':'';html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evConn_${c.id}" ${checked} style="width:16px;height:16px"><span style="font-size:.88rem">${esc(c.label)}</span></label>`;});
   if(!family.length&&(calConnections||[]).filter(c=>!/^my calendar$/i.test(c.label||'')).length===0)html+=`<div style="font-size:.76rem;color:rgba(110,145,210,.4);margin-top:2px">Add family calendars in Set Profile to share events with family.</div>`;
   html+=`</div>`;
   return html;
