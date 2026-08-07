@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.12.1 · 03/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.14.0 · 05/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -6310,9 +6310,9 @@ try{ initFirebase(); }catch(e){ console.error('Firebase init failed:',e); render
     <div style="width:200px;flex-shrink:0;background:var(--surface);border-right:1px solid rgba(110,145,210,.12);display:flex;flex-direction:column;padding:16px 10px">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:rgba(110,145,210,.5);padding:4px 8px 12px;text-transform:uppercase">Work</div>
       <button class="work-nav active" data-wpage="wToday" onclick="workNav('wToday',this)">☀️ &nbsp;Today</button>
-      <button class="work-nav" data-wpage="wMatrix" onclick="workNav('wMatrix',this)">⊞ &nbsp;Eisenhower Matrix</button>
       <button class="work-nav" data-wpage="wPriorities" onclick="workNav('wPriorities',this)">◎ &nbsp;Priorities & Pulse</button>
       <button class="work-nav" data-wpage="wKanban" onclick="workNav('wKanban',this)">▥ &nbsp;Office Kanban</button>
+      <button class="work-nav" data-wpage="wLeadership" onclick="workNav('wLeadership',this)">🧭 &nbsp;Leadership Sync</button>
       <div style="margin-top:auto;padding:8px;border-top:1px solid rgba(110,145,210,.1)">
         <div style="font-size:10px;color:rgba(110,145,210,.4);text-align:center">Work tasks are separate<br>from Personal</div>
       </div>
@@ -6471,7 +6471,23 @@ let workState = {
     { id: 4, title: "Update employee handbook", tag: "office", owner: "JM", column: "In progress" },
     { id: 5, title: "Set up vendor scorecard", tag: "operations", owner: "TD", column: "Review" },
     { id: 6, title: "Google Business photo refresh", tag: "marketing", owner: "AL", column: "Done" },
-  ]
+  ],
+  leadershipSync: {
+    agenda: [
+      { key: "segue", label: "Segue — good news", minutes: 5, done: false },
+      { key: "scorecard", label: "Scorecard review", minutes: 5, done: false },
+      { key: "rocks", label: "Rock review", minutes: 5, done: false },
+      { key: "headlines", label: "Customer/employee headlines", minutes: 5, done: false },
+      { key: "todos", label: "To-do list review", minutes: 5, done: false },
+      { key: "ids", label: "IDS — Identify, Discuss, Solve", minutes: 60, done: false },
+      { key: "conclude", label: "Conclude — recap & rate", minutes: 5, done: false },
+    ],
+    issues: [
+      { id: 1, title: "Which company — JTXD or TDX — takes priority when they compete for time", owner: "Travis", age: "New", status: "open" },
+    ],
+    todos: [],
+    history: [],
+  }
 };
 
 let currentWorkPage = 'wToday';
@@ -6520,7 +6536,7 @@ function workNav(page, btn) {
 // data and needs the visible page to reflect it immediately —
 // deleting a blocker or pulse metric from the Today page, for
 // instance, shouldn't require also being on the Priorities page.
-const WORK_PAGE_RENDERS = { wToday: renderWToday, wMatrix: renderWMatrix, wPriorities: renderWPriorities, wKanban: renderWKanban };
+const WORK_PAGE_RENDERS = { wToday: renderWToday, wPriorities: renderWPriorities, wKanban: renderWKanban, wLeadership: renderWLeadershipSync };
 function wRenderCurrentPage() {
   (WORK_PAGE_RENDERS[currentWorkPage] || renderWToday)();
 }
@@ -6549,8 +6565,8 @@ function renderWToday() {
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
       ${[
-        {icon:'🔴',label:`${doFirst.length} do first`,sub:'Urgent · Important',c:'rgba(239,68,68,.15)',page:'wMatrix'},
-        {icon:'📋',label:`${scheduled.length} scheduled`,sub:'Important · Next',c:'rgba(59,130,246,.15)',page:'wMatrix'},
+        {icon:'🔴',label:`${doFirst.length} do first`,sub:'Urgent · Important',c:'rgba(239,68,68,.15)',page:'wToday'},
+        {icon:'📋',label:`${scheduled.length} scheduled`,sub:'Important · Next',c:'rgba(59,130,246,.15)',page:'wToday'},
         {icon:'⚠️',label:`${workState.blockers.length} blockers`,sub:'Awaiting resolution',c:'rgba(245,158,11,.15)',page:'wPriorities'},
         {icon:'✅',label:`${health}% on track`,sub:'Quarterly priorities',c:'rgba(16,185,129,.15)',page:'wPriorities'},
       ].map(t => `
@@ -6567,7 +6583,7 @@ function renderWToday() {
           <span style="font-size:13px;font-weight:700">Do First</span>
           <span style="font-size:10px;color:rgba(110,145,210,.5)">Urgent · Important</span>
         </div>
-        <button class="w-btn" style="font-size:11px" onclick="workNav('wMatrix',document.querySelector('.work-nav[data-wpage=wMatrix]'))">Open matrix →</button>
+        
       </div>
       ${doFirst.map(t => `
         <div class="w-task ${t.done?'done':''}">
@@ -6614,48 +6630,6 @@ function renderWToday() {
           </div>`).join('')}
         ${!workState.blockers.length ? '<div style="font-size:12px;color:rgba(110,145,210,.4);font-style:italic;text-align:center;padding:12px">No open blockers.</div>' : ''}
       </div>
-    </div>`;
-}
-
-// ═══════════════════════════════════════
-// WORK: EISENHOWER MATRIX
-// ═══════════════════════════════════════
-const W_QUADRANTS = [
-  { key:'do', label:'Do First', sub:'Urgent · Important', color:'#ef4444' },
-  { key:'schedule', label:'Schedule', sub:'Important · Not urgent', color:'#3b82f6' },
-  { key:'delegate', label:'Delegate', sub:'Urgent · Not important', color:'#f59e0b' },
-  { key:'eliminate', label:'Eliminate', sub:'Not urgent · Not important', color:'#6e91b4' },
-];
-
-function renderWMatrix() {
-  document.getElementById('workContent').innerHTML = `
-    <div style="margin-bottom:20px">
-      <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:rgba(110,145,210,.5);text-transform:uppercase;margin-bottom:6px">Daily Execution Board</div>
-      <div style="font-size:26px;font-weight:800;letter-spacing:-.5px">Eisenhower Matrix</div>
-      <div style="font-size:13px;color:rgba(110,145,210,.6);margin-top:4px">Sort the signal from the noise. Then work the top-left.</div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      ${W_QUADRANTS.map(q => {
-        const tasks = workState.tasks.filter(t => t.quadrant === q.key && !t.done);
-        return `
-          <div class="w-quadrant" style="border-top:3px solid ${q.color}">
-            <div class="w-quadrant-head">
-              <div style="width:8px;height:8px;border-radius:2px;background:${q.color};flex-shrink:0"></div>
-              <div style="flex:1"><div style="font-size:13px;font-weight:700">${q.label}</div><div style="font-size:9px;color:rgba(110,145,210,.5);text-transform:uppercase;letter-spacing:.5px">${q.sub}</div></div>
-              <div style="font-size:11px;font-weight:700;background:rgba(110,145,210,.1);padding:3px 8px;border-radius:8px">${tasks.length}</div>
-            </div>
-            <div>
-              ${tasks.map(t => `
-                <div style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;margin-bottom:3px;transition:background .1s" onmouseover="this.style.background='rgba(110,145,210,.05)'" onmouseout="this.style.background=''">
-                  <button class="w-check" onclick="wToggleTask(${t.id})">✓</button>
-                  <span style="font-size:12px;flex:1">${wEsc(t.title)}</span>
-                  <button onclick="wDeleteTask(${t.id})" style="color:rgba(110,145,210,.2);font-size:14px;background:none;border:none;cursor:pointer">×</button>
-                </div>`).join('')}
-              ${!tasks.length ? '<div style="font-size:11px;color:rgba(110,145,210,.3);font-style:italic;padding:6px">Nothing here.</div>' : ''}
-            </div>
-            <button onclick="wAddTask('${q.key}')" style="margin-top:8px;color:rgba(110,145,210,.4);font-size:11px;padding:6px;border-radius:6px;width:100%;background:none;border:none;cursor:pointer;text-align:left;transition:all .1s" onmouseover="this.style.color='var(--amber)';this.style.background='rgba(245,158,11,.05)'" onmouseout="this.style.color='rgba(110,145,210,.4)';this.style.background=''">＋ Add action</button>
-          </div>`;
-      }).join('')}
     </div>`;
 }
 
@@ -6804,18 +6778,90 @@ function wKanbanDrop(e){
 // ═══════════════════════════════════════
 // WORK ACTIONS
 // ═══════════════════════════════════════
+function renderWLeadershipSync() {
+  const ls = workState.leadershipSync;
+  const totalMin = ls.agenda.reduce((s,a) => s+a.minutes, 0);
+  const doneMin = ls.agenda.filter(a => a.done).reduce((s,a) => s+a.minutes, 0);
+
+  document.getElementById('workContent').innerHTML = `
+    <div style="margin-bottom:24px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:rgba(110,145,210,.5);text-transform:uppercase;margin-bottom:6px">Weekly Leadership Meeting</div>
+      <div style="font-size:26px;font-weight:800;letter-spacing:-.5px">Leadership Sync</div>
+      <div style="font-size:13px;color:rgba(110,145,210,.6);margin-top:4px">Same agenda, same day, every week. Run it, solve issues, rate it, move on.</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr .8fr;gap:16px;margin-bottom:16px">
+      <div class="w-card">
+        <div class="w-card-head">
+          <div><div class="w-card-title">Meeting Agenda</div><div class="w-card-sub">${totalMin} min total</div></div>
+          <button class="w-btn" style="font-size:11px" onclick="wResetSyncAgenda()">↺ Reset for new meeting</button>
+        </div>
+        ${ls.agenda.map((a,i) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(110,145,210,.08)">
+            <button class="w-check" style="${a.done?'':'opacity:.35'}" onclick="wToggleAgendaItem(${i})">✓</button>
+            <span style="font-size:13px;font-weight:600;flex:1;${a.done?'text-decoration:line-through;color:rgba(110,145,210,.4)':''}">${wEsc(a.label)}</span>
+            <span style="font-size:10px;color:rgba(110,145,210,.5)">${a.minutes} min</span>
+          </div>`).join('')}
+        <div style="font-size:11px;color:rgba(110,145,210,.5);margin-top:10px">${doneMin} / ${totalMin} min covered</div>
+      </div>
+      <div class="w-card">
+        <div class="w-card-head"><div><div class="w-card-title">Meeting History</div><div class="w-card-sub">Rate every meeting, 1–10</div></div></div>
+        ${ls.history.slice(0,6).map(h => `
+          <div class="w-pulse-row">
+            <span style="font-size:11px;color:rgba(110,145,210,.6);flex:1">${wEsc(h.date)}</span>
+            <span style="font-size:14px;font-weight:800">${h.rating}/10</span>
+          </div>`).join('')}
+        ${!ls.history.length ? '<div style="font-size:12px;color:rgba(110,145,210,.4);font-style:italic;text-align:center;padding:16px 0">No meetings logged yet.</div>' : ''}
+        <button class="w-btn" style="margin-top:10px;width:100%;font-size:12px" onclick="wRateSyncMeeting()">＋ Log & rate today's meeting</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="w-card">
+        <div class="w-card-head">
+          <div><div class="w-card-title">Issues List (IDS)</div><div class="w-card-sub">Identify → Discuss → Solve</div></div>
+          <button class="w-btn" onclick="wAddSyncIssue()">＋ Add issue</button>
+        </div>
+        ${ls.issues.map((iss,i) => `
+          <div class="w-blocker" data-source="manual">
+            <div style="width:3px;min-height:28px;border-radius:4px;background:#3b82f6;flex-shrink:0"></div>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:600">${wEsc(iss.title)}</div>
+              <div style="font-size:10px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(iss.owner)} · ${wEsc(iss.age)}</div>
+            </div>
+            <button onclick="wSolveSyncIssue(${i})" title="Mark solved" style="background:none;border:none;color:#3b82f6;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0">Solved</button>
+          </div>`).join('')}
+        ${!ls.issues.length ? '<div style="text-align:center;padding:20px;color:rgba(110,145,210,.4);font-style:italic">Issues list is clear.</div>' : ''}
+      </div>
+      <div class="w-card">
+        <div class="w-card-head">
+          <div><div class="w-card-title">Cascading To-Dos</div><div class="w-card-sub">Action items from this meeting</div></div>
+          <button class="w-btn" onclick="wAddSyncTodo()">＋ Add to-do</button>
+        </div>
+        ${ls.todos.map((t,i) => `
+          <div class="w-task ${t.done?'done':''}">
+            <button class="w-check" onclick="wToggleSyncTodo(${i})">✓</button>
+            <div style="flex:1">
+              <span style="font-size:13px;font-weight:600">${wEsc(t.title)}</span>
+              <div style="font-size:10px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(t.owner)}</div>
+            </div>
+            <button onclick="wDeleteSyncTodo(${i})" style="color:rgba(110,145,210,.3);font-size:16px;background:none;border:none;cursor:pointer">×</button>
+          </div>`).join('')}
+        ${!ls.todos.length ? '<div style="text-align:center;padding:20px;color:rgba(110,145,210,.4);font-style:italic">No open to-dos.</div>' : ''}
+      </div>
+    </div>`;
+}
+
 function wToggleTask(id) {
   workState.tasks = workState.tasks.map(t => t.id===id ? {...t,done:!t.done} : t);
   scheduleWorkSave();
-  if (currentWorkPage === 'wToday') renderWToday();
-  else if (currentWorkPage === 'wMatrix') renderWMatrix();
+  wRenderCurrentPage();
 }
 
 function wDeleteTask(id) {
   workState.tasks = workState.tasks.filter(t => t.id!==id);
   scheduleWorkSave();
-  if (currentWorkPage === 'wToday') renderWToday();
-  else renderWMatrix();
+  wRenderCurrentPage();
 }
 
 function wAddTask(quadrant) {
@@ -6824,8 +6870,7 @@ function wAddTask(quadrant) {
   const note = prompt('Note (optional):') || '';
   workState.tasks.push({ id: Date.now(), title: title.trim(), note, quadrant, done: false });
   scheduleWorkSave();
-  if (currentWorkPage === 'wToday') renderWToday();
-  else renderWMatrix();
+  wRenderCurrentPage();
 }
 
 function wAddPriority() {
@@ -6836,6 +6881,64 @@ function wAddPriority() {
   workState.priorities.push({ id: Date.now(), title: title.trim(), owner, due, progress: 0 });
   scheduleWorkSave();
   renderWPriorities();
+}
+
+function wToggleAgendaItem(i) {
+  workState.leadershipSync.agenda[i].done = !workState.leadershipSync.agenda[i].done;
+  scheduleWorkSave();
+  renderWLeadershipSync();
+}
+
+function wResetSyncAgenda() {
+  workState.leadershipSync.agenda = workState.leadershipSync.agenda.map(a => ({...a, done: false}));
+  scheduleWorkSave();
+  renderWLeadershipSync();
+}
+
+function wAddSyncIssue() {
+  const title = prompt('Issue to identify:');
+  if (!title?.trim()) return;
+  const owner = prompt('Owner:') || 'Travis';
+  workState.leadershipSync.issues.push({ id: Date.now(), title: title.trim(), owner, age: 'New', status: 'open' });
+  scheduleWorkSave();
+  renderWLeadershipSync();
+}
+
+function wSolveSyncIssue(i) {
+  workState.leadershipSync.issues.splice(i, 1);
+  scheduleWorkSave();
+  renderWLeadershipSync();
+}
+
+function wAddSyncTodo() {
+  const title = prompt('To-do:');
+  if (!title?.trim()) return;
+  const owner = prompt('Owner:') || 'Travis';
+  workState.leadershipSync.todos.push({ id: Date.now(), title: title.trim(), owner, done: false });
+  scheduleWorkSave();
+  renderWLeadershipSync();
+}
+
+function wToggleSyncTodo(i) {
+  workState.leadershipSync.todos[i].done = !workState.leadershipSync.todos[i].done;
+  scheduleWorkSave();
+  renderWLeadershipSync();
+}
+
+function wDeleteSyncTodo(i) {
+  workState.leadershipSync.todos.splice(i, 1);
+  scheduleWorkSave();
+  renderWLeadershipSync();
+}
+
+function wRateSyncMeeting() {
+  const rating = prompt('Rate this meeting 1–10:');
+  const n = Number(rating);
+  if (!rating || isNaN(n) || n < 1 || n > 10) return;
+  const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  workState.leadershipSync.history.unshift({ date, rating: n });
+  scheduleWorkSave();
+  renderWLeadershipSync();
 }
 
 function wDeletePriority(idx) {
