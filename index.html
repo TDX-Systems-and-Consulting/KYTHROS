@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.17.2 · 07/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.17.3 · 07/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -2124,6 +2124,7 @@ async function renderCalConnectionsAndLoad() {
   try {
     const result = await _fbFunctions.httpsCallable('listMyCalendarConnections')();
     calConnections = result.data.connections || [];
+    _calConnectionsLoadedOnce = true;
     if (!calConnections.length) {
       listEl.innerHTML = 'No calendars connected yet.';
     } else {
@@ -2505,7 +2506,7 @@ function calendarEventChipClass(ev){
   return '';
 }
 
-function openEvent(id,source){const ev=allCalendarEvents().find(e=>e.id===id&&e.source===source);if(!ev)return;document.getElementById('eventId').value=ev.id;document.getElementById('eventSource').value=source;document.getElementById('eventCalId').value=ev._calId||'primary';document.getElementById('eventTitle').value=ev.title.startsWith('Due: ')?ev.title.replace(/^Due: /,''):ev.title;document.getElementById('eventDate').value=ev.date||'';document.getElementById('eventLocation').value=ev.location||'';document.getElementById('eventStartTime').value=ev.startTime||'';document.getElementById('eventEndTime').value=ev.endTime||'';document.getElementById('eventRepeat').value=ev.repeat||'';document.getElementById('eventNotes').value=ev.notes||'';document.getElementById('eventModalTitle').textContent=source==='task'?'Task Due Date':(source==='shared'?`${ev._personLabel||'Shared'}'s Event (read-only)`:'Event');document.getElementById('deleteEventBtn').style.display=(source==='task'||source==='shared')?'none':'inline-flex';document.getElementById('saveEventBtn').style.display=(source==='gcal'||source==='shared')?'none':'inline-flex';updateMapsBtn();const calBox=document.getElementById('eventCalendarPush');if(calBox)calBox.innerHTML=source==='local'?buildEventCalendarCheckboxes(state.events.find(e=>e.id===id)):'';document.getElementById('eventModal').style.display='flex'}
+async function openEvent(id,source){const ev=allCalendarEvents().find(e=>e.id===id&&e.source===source);if(!ev)return;document.getElementById('eventId').value=ev.id;document.getElementById('eventSource').value=source;document.getElementById('eventCalId').value=ev._calId||'primary';document.getElementById('eventTitle').value=ev.title.startsWith('Due: ')?ev.title.replace(/^Due: /,''):ev.title;document.getElementById('eventDate').value=ev.date||'';document.getElementById('eventLocation').value=ev.location||'';document.getElementById('eventStartTime').value=ev.startTime||'';document.getElementById('eventEndTime').value=ev.endTime||'';document.getElementById('eventRepeat').value=ev.repeat||'';document.getElementById('eventNotes').value=ev.notes||'';document.getElementById('eventModalTitle').textContent=source==='task'?'Task Due Date':(source==='shared'?`${ev._personLabel||'Shared'}'s Event (read-only)`:'Event');document.getElementById('deleteEventBtn').style.display=(source==='task'||source==='shared')?'none':'inline-flex';document.getElementById('saveEventBtn').style.display=(source==='gcal'||source==='shared')?'none':'inline-flex';updateMapsBtn();const calBox=document.getElementById('eventCalendarPush');if(calBox&&source==='local'){calBox.innerHTML='<div class="full" style="font-size:.8rem;color:var(--muted)">Loading calendars…</div>';document.getElementById('eventModal').style.display='flex';await ensureCalConnectionsLoaded();calBox.innerHTML=buildEventCalendarCheckboxes(state.events.find(e=>e.id===id));return}if(calBox)calBox.innerHTML='';document.getElementById('eventModal').style.display='flex'}
 function setEventType(type){
   document.getElementById('eventType').value=type;
   const apptBtn=document.getElementById('evTypeAppt');
@@ -2679,7 +2680,21 @@ function openLocationInMaps(location){
   }
 }
 
-function newEvent(){
+// Fetches connections into the shared calConnections array if they
+// haven't been loaded yet this session. newEvent()/openEvent() await
+// this before building the "Push to Google Calendar" checkboxes so a
+// person like Jason never silently gets left off the list just because
+// this fetch hadn't resolved yet when the modal happened to open.
+let _calConnectionsLoadedOnce=false;
+async function ensureCalConnectionsLoaded(){
+  if(_calConnectionsLoadedOnce||!_fbFunctions||!_currentUser)return;
+  try{
+    const result=await _fbFunctions.httpsCallable('listMyCalendarConnections')();
+    calConnections=result.data.connections||[];
+    _calConnectionsLoadedOnce=true;
+  }catch(e){console.warn('Could not load calendar connections:',e.message);}
+}
+async function newEvent(){
   document.getElementById('eventId').value='';
   document.getElementById('eventSource').value='local';
   document.getElementById('eventTitle').value='';
@@ -2699,8 +2714,10 @@ function newEvent(){
   setEventType('appointment');
   updateMapsBtn();
   const calBox=document.getElementById('eventCalendarPush');
-  if(calBox)calBox.innerHTML=buildEventCalendarCheckboxes();
+  if(calBox)calBox.innerHTML='<div class="full" style="font-size:.8rem;color:var(--muted)">Loading calendars…</div>';
   document.getElementById('eventModal').style.display='flex';
+  await ensureCalConnectionsLoaded();
+  if(calBox)calBox.innerHTML=buildEventCalendarCheckboxes();
   // Load Places API and (re)init autocomplete
   loadPlacesAPI();
   setTimeout(function(){
