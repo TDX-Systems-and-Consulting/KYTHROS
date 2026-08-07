@@ -2155,10 +2155,23 @@ window.renderSharedCalStatus = renderSharedCalStatus;
 // has stored). Same visible date range as allCalendarEvents() uses
 // for its own local/task events, so everything lines up on one grid.
 async function loadSharedCalEvents(userData) {
-  if (_sharedCalLoading || !_fbFunctions) return;
+  if (_sharedCalLoading || !_fbFunctions || !_currentUser) return;
   const sharedWithMe = userData?.sharedWithMe || [];
   const emails = userData?.sharedWithMeEmails || {};
-  if (!sharedWithMe.length) { sharedCalEvents = []; renderCalendar(); return; }
+  const selfConnected = !!userData?.googleCalendarSharedConnected;
+
+  // Originally this only fetched OTHER people's events, on the
+  // assumption the existing personal (client-side) connection already
+  // covered the user's own calendar. In practice that assumption
+  // didn't hold for everyone -- if the personal connection isn't
+  // actually showing real events, connecting the NEW shared
+  // connection looked like it did nothing. Now also fetches the
+  // current user's own events through this same server-side
+  // connection whenever it's on, so it's useful even standalone.
+  const targets = [...sharedWithMe.map(uid => ({ uid, label: emails[uid] || uid, isSelf: false }))];
+  if (selfConnected) targets.push({ uid: _currentUser.uid, label: 'You', isSelf: true });
+
+  if (!targets.length) { sharedCalEvents = []; renderCalendar(); return; }
 
   _sharedCalLoading = true;
   try {
@@ -2167,15 +2180,24 @@ async function loadSharedCalEvents(userData) {
     const timeMax = new Date(today.getFullYear(), today.getMonth() + 4, 0).toISOString();
     const getEvents = _fbFunctions.httpsCallable('getUserCalendarEvents');
 
-    const results = await Promise.all(sharedWithMe.map(uid =>
-      getEvents({ targetUid: uid, timeMin, timeMax })
-        .then(r => ({ uid, label: emails[uid] || uid, data: r.data }))
-        .catch(e => { console.warn('Could not load shared events for', uid, ':', e.message); return { uid, label: emails[uid] || uid, data: { connected: false, events: [] } }; })
+    const results = await Promise.all(targets.map(t =>
+      getEvents({ targetUid: t.uid, timeMin, timeMax })
+        .then(r => ({ ...t, data: r.data }))
+        .catch(e => { console.warn('Could not load shared events for', t.uid, ':', e.message); return { ...t, data: { connected: false, events: [] } }; })
     ));
 
     const merged = [];
-    results.forEach(({ uid, label, data }) => {
+    results.forEach(({ uid, label, isSelf, data }) => {
       if (!data.connected) return; // they haven't connected their OWN shared calendar yet — nothing to show
+      // Self defaults to purple specifically (not just whichever
+      // color the first-come-first-served palette happens to assign),
+      // honoring "me as purple, him as blue" directly rather than
+      // leaving it to arbitrary ordering. Still adjustable afterward
+      // the same way every shared-person color already is.
+      if (isSelf) {
+        const colors = loadSharedPersonColors();
+        if (!colors[uid]) { colors[uid] = '#a855f7'; saveSharedPersonColors(colors); }
+      }
       (data.events || []).forEach(ev => {
         merged.push({
           id: `shared-${uid}-${ev.id}`,
