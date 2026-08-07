@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.17.3 · 07/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.17.4 · 07/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -5716,9 +5716,7 @@ function getSelectedEventCalendars(){
 // stored refresh token via the pushEventToConnection function.
 function getSelectedEventConnections(){
   const ids=[];
-  const myEmail=(_currentUser&&_currentUser.email||'').toLowerCase();
   (calConnections||[]).forEach(c=>{
-    if((c.googleEmail||'').toLowerCase()===myEmail)return; // that one's covered by evCalPrimary/gapi already
     const cb=document.getElementById('evConn_'+c.id);
     if(cb&&cb.checked)ids.push(c.id);
   });
@@ -5786,15 +5784,15 @@ function buildEventCalendarCheckboxes(existingEvent){
   let html=`<div class="full" style="background:rgba(77,141,255,.07);border:1px solid rgba(77,141,255,.15);border-radius:12px;padding:12px 14px"><div style="font-size:.82rem;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">Push to Google Calendar</div>`;
   html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evCalPrimary" checked style="width:16px;height:16px"><span style="font-size:.88rem">My Calendar</span></label>`;
   family.forEach((fc,i)=>{html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evCal_${i}" checked style="width:16px;height:16px"><span style="font-size:.88rem">${esc(fc.name)}</span></label>`;});
-  // The connection representing Travis's OWN Google account is already
-  // covered by "My Calendar" above (via the client-side gapi session) —
-  // exclude it here by matching googleEmail against the signed-in
-  // user's own email rather than assuming a specific label string like
-  // "My Calendar", since connections get labeled whatever the person
-  // typed when connecting (e.g. "Travis").
-  const myEmail=(_currentUser&&_currentUser.email||'').toLowerCase();
-  (calConnections||[]).filter(c=>(c.googleEmail||'').toLowerCase()!==myEmail).forEach(c=>{const checked=pushedTo[c.id]?'checked':'';html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evConn_${c.id}" ${checked} style="width:16px;height:16px"><span style="font-size:.88rem">${esc(c.label)}</span></label>`;});
-  if(!family.length&&(calConnections||[]).filter(c=>(c.googleEmail||'').toLowerCase()!==myEmail).length===0)html+=`<div style="font-size:.76rem;color:rgba(110,145,210,.4);margin-top:2px">Add family calendars in Set Profile to share events with family.</div>`;
+  // NOTE: connections don't reliably carry a googleEmail (the OAuth
+  // flow only requests calendar scope, so the email lookup silently
+  // fails) — there's no dependable way to detect "this connection is
+  // actually me" and hide it. Every connection is listed, even one that
+  // might duplicate "My Calendar" above; checking both just means one
+  // extra harmless copy on your own calendar, which beats wrongly
+  // hiding what might be a different account.
+  (calConnections||[]).forEach(c=>{const checked=pushedTo[c.id]?'checked':'';html+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="evConn_${c.id}" ${checked} style="width:16px;height:16px"><span style="font-size:.88rem">${esc(c.label)}</span></label>`;});
+  if(!family.length&&(calConnections||[]).length===0)html+=`<div style="font-size:.76rem;color:rgba(110,145,210,.4);margin-top:2px">Add family calendars in Set Profile to share events with family.</div>`;
   html+=`</div>`;
   return html;
 }

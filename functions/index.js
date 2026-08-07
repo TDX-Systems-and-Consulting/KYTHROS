@@ -80,7 +80,14 @@ exports.gcalOAuthStart = functions.https.onRequest(async (req, res) => {
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',      // needed to get a refresh_token
     prompt: 'consent select_account', // forces the account picker every time -- critical here, since this is how a second person (Jason) gets to choose HIS OWN Google account instead of whatever was last signed in
-    scope: ['https://www.googleapis.com/auth/calendar'],
+    scope: [
+      'https://www.googleapis.com/auth/calendar',
+      // Needed for the userinfo.get() call below to succeed — without
+      // this, that lookup silently fails and googleEmail never gets
+      // stored, which is exactly what happened for every connection
+      // made before this fix.
+      'https://www.googleapis.com/auth/userinfo.email'
+    ],
     state
   });
   res.redirect(authUrl);
