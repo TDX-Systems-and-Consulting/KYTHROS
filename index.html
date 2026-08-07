@@ -2129,7 +2129,7 @@ async function renderCalConnectionsAndLoad() {
     } else {
       listEl.innerHTML = calConnections.map(c => `
         <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(var(--surface2-rgb),.6);border:1px solid var(--line);border-radius:10px;padding:4px 10px;margin:2px 4px 2px 0">
-          <span style="width:10px;height:10px;border-radius:50%;background:${getSharedPersonColor(c.id, c.label)};flex-shrink:0"></span>
+          <input type="color" value="${getSharedPersonColor(c.id, c.label)}" onchange="setSharedPersonColor('${c.id}', this.value)" title="Change color for ${wEsc(c.label)}" style="width:14px;height:14px;padding:0;border:none;border-radius:50%;flex-shrink:0;cursor:pointer;-webkit-appearance:none;appearance:none;background:${getSharedPersonColor(c.id, c.label)}" />
           ${wEsc(c.label)}${c.googleEmail ? ` <span style="opacity:.6">(${wEsc(c.googleEmail)})</span>` : ''}
           <button onclick="removeCalendarConnection('${c.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:0;font-size:.9rem">✕</button>
         </span>`).join('');
@@ -6557,6 +6557,10 @@ try{ initFirebase(); }catch(e){ console.error('Firebase init failed:',e); render
 .w-pulse-row:last-child { border:none; }
 .w-trend-up { font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;background:rgba(16,185,129,.15);color:#10b981; }
 .w-trend-dn { font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;background:rgba(239,68,68,.15);color:#ef4444; }
+input[type="color"]{padding:0;border:none}
+input[type="color"]::-webkit-color-swatch-wrapper{padding:0;border-radius:50%}
+input[type="color"]::-webkit-color-swatch{border:none;border-radius:50%}
+input[type="color"]::-moz-color-swatch{border:none;border-radius:50%}
 </style>
 
 <script>
