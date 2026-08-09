@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.18.2 · 08/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.19.0 · 09/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -6591,6 +6591,7 @@ try{ initFirebase(); }catch(e){ console.error('Firebase init failed:',e); render
       <button class="work-nav" data-wpage="wPriorities" onclick="workNav('wPriorities',this)">◎ &nbsp;Priorities & Pulse</button>
       <button class="work-nav" data-wpage="wKanban" onclick="workNav('wKanban',this)">▥ &nbsp;Office Kanban</button>
       <button class="work-nav" data-wpage="wLeadership" onclick="workNav('wLeadership',this)">🧭 &nbsp;Leadership Sync</button>
+      <button class="work-nav" data-wpage="wCalendar" onclick="workNavCalendar(this)">📅 &nbsp;Calendar</button>
       <div style="margin-top:auto;padding:8px;border-top:1px solid rgba(110,145,210,.1)">
         <div style="font-size:10px;color:rgba(110,145,210,.4);text-align:center">Work tasks are separate<br>from Personal</div>
       </div>
@@ -6695,6 +6696,25 @@ function setPlannerMode(mode, btn) {
   } else {
     // Show personal UI
     workPanel.style.display = 'none';
+    // Same safety check workNav() already does before overwriting
+    // workContent: if calendarPage's real DOM node is currently
+    // parked inside Work mode's content area (from workNavCalendar),
+    // move it back to its original position FIRST. Skipping this
+    // would leave it trapped inside workModePanel, which is about to
+    // go display:none — a hidden ancestor hides it too, regardless of
+    // its own display value, so Personal mode's own Calendar tab
+    // would show blank until a full page reload.
+    const _calPage = document.getElementById('calendarPage');
+    const _workContentEl = document.getElementById('workContent');
+    if (_calPage && _workContentEl && _calPage.parentNode === _workContentEl) {
+      if (_calendarPageOriginalNextSibling) {
+        _calendarPageOriginalParent.insertBefore(_calPage, _calendarPageOriginalNextSibling);
+      } else if (_calendarPageOriginalParent) {
+        _calendarPageOriginalParent.appendChild(_calPage);
+      }
+      _calPage.style.display = 'none';
+      _calPage.classList.remove('active');
+    }
     if (mainTabs) mainTabs.style.display = '';
     if (newTaskBtn) newTaskBtn.style.display = '';
     // Just clear any inline display override and let the .page/
@@ -6806,12 +6826,65 @@ async function saveWorkState() {
 // ═══════════════════════════════════════
 // WORK NAVIGATION
 // ═══════════════════════════════════════
+let _calendarPageOriginalParent = null;
+let _calendarPageOriginalNextSibling = null;
+
 function workNav(page, btn) {
   currentWorkPage = page;
   document.querySelectorAll('.work-nav').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  // If the REAL calendarPage element is currently parked inside
+  // workContent (left there by workNavCalendar below), move it back
+  // to its original position in the DOM BEFORE wRenderCurrentPage()
+  // runs — every other Work page render does
+  // workContent.innerHTML = '...', which would silently destroy the
+  // live calendar element (Google sync state, listeners, everything)
+  // if it were still nested inside workContent at that moment.
+  const calPage = document.getElementById('calendarPage');
+  const workContent = document.getElementById('workContent');
+  if (calPage && workContent && calPage.parentNode === workContent) {
+    if (_calendarPageOriginalNextSibling) {
+      _calendarPageOriginalParent.insertBefore(calPage, _calendarPageOriginalNextSibling);
+    } else if (_calendarPageOriginalParent) {
+      _calendarPageOriginalParent.appendChild(calPage);
+    }
+    calPage.style.display = 'none';
+    calPage.classList.remove('active');
+  }
   wRenderCurrentPage();
 }
+
+// Calendar is a real, fully-built page (Google Calendar sync, multiple
+// named connections, task due dates) that already existed under
+// Personal mode -- it was never duplicated or rebuilt here, and it
+// lives in a completely different part of the DOM than workModePanel
+// (a plain show/hide toggle would render it as a disconnected block,
+// not cleanly inside the Work content pane). This actually MOVES the
+// live calendarPage node into workContent -- same element, same
+// state, zero risk of the two calendars drifting apart since there's
+// only ever one real calendar. workNav() above moves it back out
+// before any other Work page's innerHTML render would otherwise
+// destroy it in place.
+function workNavCalendar(btn) {
+  currentWorkPage = 'wCalendar';
+  document.querySelectorAll('.work-nav').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const workContent = document.getElementById('workContent');
+  const calPage = document.getElementById('calendarPage');
+  if (workContent && calPage) {
+    if (!_calendarPageOriginalParent) {
+      _calendarPageOriginalParent = calPage.parentNode;
+      _calendarPageOriginalNextSibling = calPage.nextSibling;
+    }
+    workContent.innerHTML = '';
+    workContent.appendChild(calPage);
+    calPage.style.display = '';
+    calPage.classList.add('active');
+    try { renderCalendar(); } catch(e) { console.error('Calendar render failed:', e); }
+    try { renderCalendarSidebar(); } catch(e) { console.error('Calendar sidebar render failed:', e); }
+  }
+}
+window.workNavCalendar = workNavCalendar;
 
 // Renders whichever Work page is currently active. Used both by
 // workNav (switching tabs) and by any action that edits workState
