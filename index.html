@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.18.0 · 08/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.18.1 · 08/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -7449,6 +7449,8 @@ function wRenderJmPulseRows() {
   };
   const rows = [
     { label: 'Active jobs', value: jmPulseSync.activeJobs, trend: fmtTrend(trend.activeJobs, true) },
+    { label: 'Collected MTD', value: jmPulseSync.collectedMTD != null ? '$' + jmPulseSync.collectedMTD.toLocaleString() : null, trend: fmtTrend(trend.collectedMTD, true) },
+    { label: 'Net MTD', value: jmPulseSync.netMTD != null ? (jmPulseSync.netMTD >= 0 ? '+$' : '-$') + Math.abs(jmPulseSync.netMTD).toLocaleString() : null, trend: fmtTrend(trend.netMTD, true) },
     { label: 'Outstanding invoices', value: jmPulseSync.outstandingInvoices != null ? '$' + jmPulseSync.outstandingInvoices.toLocaleString() : null, trend: fmtTrend(trend.outstandingInvoices, false) },
     { label: 'Unprocessed change orders', value: jmPulseSync.unprocessedCOs, trend: fmtTrend(trend.unprocessedCOs, false) },
   ].filter(r => r.value !== null && r.value !== undefined);
