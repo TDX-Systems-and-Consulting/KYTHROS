@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.17.4 · 07/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.18.0 · 08/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -366,8 +366,8 @@
       <button class="btn" id="userBadge" onclick="openUserProfile()" style="display:inline-flex;align-items:center;gap:6px">👤 Set Profile</button>
       <button class="btn" onclick="switchUser()" title="Switch User">🔀</button>
       <div class="focus-toggle">
-        <button class="focus-btn active" id="modePersonal" onclick="setPlannerMode('personal',this)">Personal</button>
-        <button class="focus-btn" id="modeWork" onclick="setPlannerMode('work',this)">Work</button>
+        <button class="focus-btn" id="modePersonal" onclick="setPlannerMode('personal',this)">Personal</button>
+        <button class="focus-btn active" id="modeWork" onclick="setPlannerMode('work',this)">Work</button>
       </div>
       <button class="btn btn-primary" id="newTaskBtn" onclick="openTask()">+ Add Task</button>
       <button class="btn" id="exportBtn" onclick="exportJson()" style="opacity:.55" title="Download a full backup of your workspace as a JSON file">⬇ Backup</button>
@@ -6674,7 +6674,7 @@ input[type="color"]::-moz-color-swatch{border:none;border-radius:50%}
 // ═══════════════════════════════════════
 // PLANNER MODE — Personal / Work toggle
 // ═══════════════════════════════════════
-let plannerMode = 'personal';
+let plannerMode = 'work';
 
 function setPlannerMode(mode, btn) {
   plannerMode = mode;
@@ -7352,6 +7352,13 @@ function wDeleteCard(id) {
 
 // Load work state when Firebase auth is ready
 document.addEventListener('DOMContentLoaded', () => {
+  // Work mode is now the default landing state (was Personal) — the
+  // whole point of the two-monitor setup is JOBSMETRIX on one screen,
+  // PlannerXD's business pulse on the other, immediately, not behind
+  // an extra click every single time the app opens.
+  const workBtn = document.getElementById('modeWork');
+  if (workBtn) setPlannerMode('work', workBtn);
+
   const unsubscribe = firebase.auth().onAuthStateChanged(user => {
     if (user) {
       loadWorkState().then(() => {
