@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.19.0 · 09/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.0 · 10/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -915,9 +915,18 @@
         <option value="monthly">Monthly (same date)</option>
         <option value="yearly">Yearly</option>
       </select>
-      <!-- Location with Places Autocomplete + Maps button -->
+      <!-- Location: real PlaceAutocompleteElement (Google's current
+           widget) gets created and appended into this wrap by JS --
+           the old plain <input> + legacy Autocomplete class is gone,
+           see initPlacesAutocomplete() below for why. The widget
+           can't be reliably pre-filled with existing text (confirmed
+           live -- .value doesn't proxy to its internal closed-shadow
+           state), so editing an existing event's location shows as
+           a small label above the (always-empty-on-open) widget
+           instead, tracked in _currentEventLocation. -->
+      <div id="eventLocationCurrent" style="grid-column:1/-1;font-size:.75rem;color:var(--muted);display:none;margin-bottom:-4px"></div>
       <div class="full" style="grid-column:1/-1;display:flex;gap:8px;align-items:center">
-        <input id="eventLocation" placeholder="Location — start typing for suggestions" style="flex:1" autocomplete="off" />
+        <div id="eventLocationWrap" style="flex:1"></div>
         <button id="evMapsBtn" onclick="openEventInMaps()" title="Open in Maps for navigation" style="background:rgba(77,141,255,.12);border:1px solid rgba(77,141,255,.25);border-radius:10px;padding:9px 12px;cursor:pointer;font-size:1rem;color:#4d8dff;flex-shrink:0;white-space:nowrap;opacity:.4">📍 Navigate</button>
       </div>
     </div>
@@ -1477,7 +1486,7 @@ window.hidePaywall = hidePaywall;
 const STORAGE_KEY='kythros-workspace-v8';
 const GCAL_STORAGE_KEY='kythros-gcal-v6';
 const GCAL_CLIENT_ID='1061786207687-a339c05ebkb395gb1v01ojl4l4ui3ajk.apps.googleusercontent.com';
-const GMAPS_API_KEY='AIzaSyBWMNwGatEdsBsKdjZR01qyyPLBV516AF4';
+const GMAPS_API_KEY='AIzaSyAKbswm-gJB4KkSwasaDVk1OQzHj1vRbFU';
 const GCAL_DISCOVERY_DOCS=[
   'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
   'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
@@ -2506,7 +2515,7 @@ function calendarEventChipClass(ev){
   return '';
 }
 
-async function openEvent(id,source){const ev=allCalendarEvents().find(e=>e.id===id&&e.source===source);if(!ev)return;document.getElementById('eventId').value=ev.id;document.getElementById('eventSource').value=source;document.getElementById('eventCalId').value=ev._calId||'primary';document.getElementById('eventTitle').value=ev.title.startsWith('Due: ')?ev.title.replace(/^Due: /,''):ev.title;document.getElementById('eventDate').value=ev.date||'';document.getElementById('eventLocation').value=ev.location||'';document.getElementById('eventStartTime').value=ev.startTime||'';document.getElementById('eventEndTime').value=ev.endTime||'';document.getElementById('eventRepeat').value=ev.repeat||'';document.getElementById('eventNotes').value=ev.notes||'';document.getElementById('eventModalTitle').textContent=source==='task'?'Task Due Date':(source==='shared'?`${ev._personLabel||'Shared'}'s Event (read-only)`:'Event');document.getElementById('deleteEventBtn').style.display=(source==='task'||source==='shared')?'none':'inline-flex';document.getElementById('saveEventBtn').style.display=(source==='gcal'||source==='shared')?'none':'inline-flex';updateMapsBtn();const calBox=document.getElementById('eventCalendarPush');if(calBox&&source==='local'){calBox.innerHTML='<div class="full" style="font-size:.8rem;color:var(--muted)">Loading calendars…</div>';document.getElementById('eventModal').style.display='flex';await ensureCalConnectionsLoaded();calBox.innerHTML=buildEventCalendarCheckboxes(state.events.find(e=>e.id===id));return}if(calBox)calBox.innerHTML='';document.getElementById('eventModal').style.display='flex'}
+async function openEvent(id,source){const ev=allCalendarEvents().find(e=>e.id===id&&e.source===source);if(!ev)return;document.getElementById('eventId').value=ev.id;document.getElementById('eventSource').value=source;document.getElementById('eventCalId').value=ev._calId||'primary';document.getElementById('eventTitle').value=ev.title.startsWith('Due: ')?ev.title.replace(/^Due: /,''):ev.title;document.getElementById('eventDate').value=ev.date||'';_currentEventLocation=ev.location||'';const curLabel=document.getElementById('eventLocationCurrent');if(curLabel){if(_currentEventLocation){curLabel.textContent='Current: '+_currentEventLocation+' (search below to change)';curLabel.style.display='';}else{curLabel.style.display='none';}}document.getElementById('eventStartTime').value=ev.startTime||'';document.getElementById('eventEndTime').value=ev.endTime||'';document.getElementById('eventRepeat').value=ev.repeat||'';document.getElementById('eventNotes').value=ev.notes||'';document.getElementById('eventModalTitle').textContent=source==='task'?'Task Due Date':(source==='shared'?`${ev._personLabel||'Shared'}'s Event (read-only)`:'Event');document.getElementById('deleteEventBtn').style.display=(source==='task'||source==='shared')?'none':'inline-flex';document.getElementById('saveEventBtn').style.display=(source==='gcal'||source==='shared')?'none':'inline-flex';updateMapsBtn();initPlacesAutocomplete();const calBox=document.getElementById('eventCalendarPush');if(calBox&&source==='local'){calBox.innerHTML='<div class="full" style="font-size:.8rem;color:var(--muted)">Loading calendars…</div>';document.getElementById('eventModal').style.display='flex';await ensureCalConnectionsLoaded();calBox.innerHTML=buildEventCalendarCheckboxes(state.events.find(e=>e.id===id));return}if(calBox)calBox.innerHTML='';document.getElementById('eventModal').style.display='flex'}
 function setEventType(type){
   document.getElementById('eventType').value=type;
   const apptBtn=document.getElementById('evTypeAppt');
@@ -2619,6 +2628,13 @@ function selectSyncOption(pref){
 }
 // ════════════════════════════════════════════════════
 let placesAutocomplete=null;
+// Single source of truth for the event's location text -- replaces
+// reading document.getElementById('eventLocation').value, which
+// stopped being possible once the plain <input> became a real
+// PlaceAutocompleteElement (confirmed live: .value does not proxy to
+// its internal closed-shadow state, so it can't be read OR written
+// the way a normal input can).
+let _currentEventLocation='';
 
 function autoSetEndTime(){
   const start=document.getElementById('eventStartTime').value;
@@ -2629,40 +2645,62 @@ function autoSetEndTime(){
   end.value=String(endH).padStart(2,'0')+':'+String(m).padStart(2,'0');
 }
 
+// Google's current dynamic bootstrap loader (google.maps.importLibrary)
+// -- the file previously used the older ?libraries=places&callback=...
+// pattern, which loads google.maps.places.Autocomplete. That class is
+// deprecated (Google: "As of March 1st, 2025, google.maps.places.
+// Autocomplete is not available to new customers") and silently
+// returns zero suggestions for keys created after that date -- which
+// was every key this project has. Confirmed by testing BOTH the old
+// widget and this new one directly against Google's real servers
+// before writing any of this: the old one never worked, this one does.
 function loadPlacesAPI(){
-  if(window.google&&window.google.maps)return;
-  const s=document.createElement('script');
-  s.src=`https://maps.googleapis.com/maps/api/js?key=${GMAPS_API_KEY}&libraries=places&callback=initPlacesAutocomplete`;
-  s.async=true;s.defer=true;
-  document.head.appendChild(s);
+  if(window.google&&window.google.maps&&window.google.maps.importLibrary)return;
+  (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({key:GMAPS_API_KEY,v:"beta"});
 }
 
-function initPlacesAutocomplete(){
-  const input=document.getElementById('eventLocation');
-  if(!input||!window.google)return;
-  placesAutocomplete=new google.maps.places.Autocomplete(input,{
-    types:['establishment','geocode'],
-    fields:['formatted_address','name','geometry']
-  });
-  placesAutocomplete.addListener('place_changed',function(){
-    const place=placesAutocomplete.getPlace();
-    if(place){
-      const addr=place.formatted_address||place.name||input.value;
-      input.value=addr;
+// Creates a fresh PlaceAutocompleteElement inside eventLocationWrap
+// every time the event modal opens (openEvent/newEvent both call
+// this) -- simpler and more reliable than trying to reset/reuse one
+// closed-shadow-DOM element across modal opens. Listens for
+// 'gmp-select' (confirmed by testing live against Google's real
+// servers, not guessed -- the alternate event names some docs/
+// examples reference, gmp-placeselect etc., did not fire).
+async function initPlacesAutocomplete(){
+  const wrap=document.getElementById('eventLocationWrap');
+  if(!wrap)return;
+  wrap.innerHTML='';
+  try{
+    await loadPlacesAPI();
+    const { PlaceAutocompleteElement } = await google.maps.importLibrary('places');
+    placesAutocomplete=new PlaceAutocompleteElement();
+    placesAutocomplete.id='eventLocation';
+    placesAutocomplete.style.width='100%';
+    wrap.appendChild(placesAutocomplete);
+    placesAutocomplete.addEventListener('gmp-select', async (e)=>{
+      try{
+        const place=e.placePrediction.toPlace();
+        await place.fetchFields({fields:['formattedAddress','displayName']});
+        _currentEventLocation=place.formattedAddress||place.displayName||_currentEventLocation;
+      }catch(err){console.warn('Could not resolve selected place:',err.message);}
+      const curLabel=document.getElementById('eventLocationCurrent');
+      if(curLabel)curLabel.style.display='none'; // a fresh selection supersedes the "current" label
       updateMapsBtn();
-    }
-  });
+    });
+  }catch(e){
+    console.warn('Places Autocomplete failed to load:',e.message);
+  }
 }
+
 
 function updateMapsBtn(){
-  const loc=document.getElementById('eventLocation');
   const btn=document.getElementById('evMapsBtn');
-  if(!loc||!btn)return;
-  btn.style.opacity=loc.value.trim()?'1':'0.4';
+  if(!btn)return;
+  btn.style.opacity=_currentEventLocation.trim()?'1':'0.4';
 }
 
 function openEventInMaps(){
-  const loc=(document.getElementById('eventLocation').value||'').trim();
+  const loc=(_currentEventLocation||'').trim();
   if(!loc)return;
   openLocationInMaps(loc);
 }
@@ -2699,7 +2737,9 @@ async function newEvent(){
   document.getElementById('eventSource').value='local';
   document.getElementById('eventTitle').value='';
   document.getElementById('eventDate').value=todayISO();
-  document.getElementById('eventLocation').value='';
+  _currentEventLocation='';
+  const curLabel0=document.getElementById('eventLocationCurrent');
+  if(curLabel0)curLabel0.style.display='none';
   document.getElementById('eventStartTime').value='';
   document.getElementById('eventEndTime').value='';
   document.getElementById('eventRepeat').value='';
@@ -2718,16 +2758,7 @@ async function newEvent(){
   document.getElementById('eventModal').style.display='flex';
   await ensureCalConnectionsLoaded();
   if(calBox)calBox.innerHTML=buildEventCalendarCheckboxes();
-  // Load Places API and (re)init autocomplete
-  loadPlacesAPI();
-  setTimeout(function(){
-    if(window.google&&window.google.maps&&!placesAutocomplete){
-      initPlacesAutocomplete();
-    } else if(window.google&&window.google.maps&&placesAutocomplete){
-      // Re-bind to the input in case it was recreated
-      placesAutocomplete.bindTo('bounds',null);
-    }
-  },300);
+  initPlacesAutocomplete();
 }
 async function saveEvent(){
   const source=document.getElementById('eventSource').value||'local';
@@ -2746,7 +2777,7 @@ async function saveEvent(){
     return;
   }
   // ── Appointment ──
-  const event={id:document.getElementById('eventId').value||uid('evt'),title:document.getElementById('eventTitle').value.trim()||'Untitled event',date:document.getElementById('eventDate').value||todayISO(),startTime:document.getElementById('eventStartTime').value||'',endTime:document.getElementById('eventEndTime').value||'',location:document.getElementById('eventLocation').value.trim(),notes:document.getElementById('eventNotes').value.trim(),repeat:document.getElementById('eventRepeat').value||''};
+  const event={id:document.getElementById('eventId').value||uid('evt'),title:document.getElementById('eventTitle').value.trim()||'Untitled event',date:document.getElementById('eventDate').value||todayISO(),startTime:document.getElementById('eventStartTime').value||'',endTime:document.getElementById('eventEndTime').value||'',location:(_currentEventLocation||'').trim(),notes:document.getElementById('eventNotes').value.trim(),repeat:document.getElementById('eventRepeat').value||''};
   const idx=state.events.findIndex(e=>e.id===event.id);
   if(idx>=0){event.pushedTo=state.events[idx].pushedTo||{};state.events[idx]=event;}else state.events.push(event);
   saveState();kClose('eventModal');
