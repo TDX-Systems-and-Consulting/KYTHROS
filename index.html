@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.1 · 10/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.2 · 10/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -6313,6 +6313,7 @@ function renderCalendar(){
   // widget visible outside the Calendar page too, so it should keep
   // running on every poll regardless of which page is mounted.
   const calMounted = !!document.getElementById('calendarTitle');
+  if (_workNavInProgress) return; // see workNav/workNavCalendar above
   if (calMounted) {
     if(calView==='week'){renderCalWeek();}
     else if(calView==='day'){renderCalDay();}
@@ -6884,7 +6885,24 @@ async function saveWorkState() {
 let _calendarPageOriginalParent = null;
 let _calendarPageOriginalNextSibling = null;
 
+// Guards against the 60s background poll (loadSharedCalEvents ->
+// renderCalendar) interleaving mid-navigation. Both workNav() and
+// workNavCalendar() do multi-step DOM surgery (move calendarPage in
+// or out, then render) that isn't atomic -- loadSharedCalEvents is
+// async and can resume between any of those steps if its network
+// call happens to still be in flight when a click fires. Confirmed
+// this class of interleaving is real (the renderCalMonth null-crash
+// fixed earlier was one symptom of it) but couldn't reproduce the
+// specific silent failure Travis hit a second time even after
+// several attempts at the exact repro sequence -- rather than keep
+// guessing at the precise interleaving, this closes off the whole
+// category: the poll's render call is skipped outright while a
+// navigation is actively in progress, and picks up fresh data on its
+// next 60s tick instead.
+let _workNavInProgress = false;
+
 function workNav(page, btn) {
+  _workNavInProgress = true;
   currentWorkPage = page;
   document.querySelectorAll('.work-nav').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
@@ -6907,6 +6925,7 @@ function workNav(page, btn) {
     calPage.classList.remove('active');
   }
   wRenderCurrentPage();
+  _workNavInProgress = false;
 }
 
 // Calendar is a real, fully-built page (Google Calendar sync, multiple
@@ -6921,23 +6940,31 @@ function workNav(page, btn) {
 // before any other Work page's innerHTML render would otherwise
 // destroy it in place.
 function workNavCalendar(btn) {
+  console.log('[calNav] workNavCalendar called, currentWorkPage was:', currentWorkPage);
+  _workNavInProgress = true;
   currentWorkPage = 'wCalendar';
   document.querySelectorAll('.work-nav').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   const workContent = document.getElementById('workContent');
   const calPage = document.getElementById('calendarPage');
+  console.log('[calNav] workContent found:', !!workContent, 'calPage found:', !!calPage, 'calPage current parent:', calPage?.parentNode?.id || calPage?.parentNode?.tagName);
   if (workContent && calPage) {
     if (!_calendarPageOriginalParent) {
       _calendarPageOriginalParent = calPage.parentNode;
       _calendarPageOriginalNextSibling = calPage.nextSibling;
+      console.log('[calNav] captured original parent (first time):', _calendarPageOriginalParent?.id || _calendarPageOriginalParent?.tagName);
     }
     workContent.innerHTML = '';
     workContent.appendChild(calPage);
     calPage.style.display = '';
     calPage.classList.add('active');
-    try { renderCalendar(); } catch(e) { console.error('Calendar render failed:', e); }
-    try { renderCalendarSidebar(); } catch(e) { console.error('Calendar sidebar render failed:', e); }
+    console.log('[calNav] after append -- calPage parent is workContent:', calPage.parentNode === workContent, 'display:', calPage.style.display);
+    try { renderCalendar(); console.log('[calNav] renderCalendar() completed without throwing'); } catch(e) { console.error('[calNav] Calendar render failed:', e); }
+    try { renderCalendarSidebar(); } catch(e) { console.error('[calNav] Calendar sidebar render failed:', e); }
+  } else {
+    console.error('[calNav] BAILED OUT -- workContent or calPage missing entirely. workContent:', workContent, 'calPage:', calPage);
   }
+  _workNavInProgress = false;
 }
 window.workNavCalendar = workNavCalendar;
 
