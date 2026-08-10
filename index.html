@@ -355,7 +355,7 @@
 </div>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.0 · 10/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.1 · 10/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -6292,9 +6292,33 @@ function calNextPeriod(){
 function calNext(){calendarDate=new Date();renderCalendar();}
 
 function renderCalendar(){
-  if(calView==='week'){renderCalWeek();renderUpcoming();return;}
-  if(calView==='day'){renderCalDay();renderUpcoming();return;}
-  renderCalMonth();renderUpcoming();
+  // Real crash, confirmed via Travis's own console: loadSharedCalEvents
+  // polls every 60s regardless of which page is currently showing, and
+  // used to call straight into renderCalMonth/Week/Day unconditionally
+  // -- each of those assumes its own title/grid elements exist in the
+  // DOM, which is only true while the Calendar page is actually
+  // mounted (it gets moved in/out of workContent when switching Work
+  // mode tabs, see workNavCalendar()). Firing while any other page was
+  // showing threw an uncaught TypeError setting textContent on null,
+  // which happened via the *same* independent setInterval regardless
+  // of what was clicked -- not necessarily the direct cause of the
+  // Calendar button itself failing to switch content, but a real,
+  // confirmed bug on its own regardless. sharedCalEvents is already
+  // updated in memory by the time this runs either way, so skipping
+  // just these three calls loses nothing -- workNavCalendar() already
+  // calls renderCalendar() itself right after mounting the page, so
+  // the freshly-polled data renders correctly the moment it's
+  // actually navigated to. renderUpcoming() is left unguarded here --
+  // it already has its own null-check (#upcomingList) and may power a
+  // widget visible outside the Calendar page too, so it should keep
+  // running on every poll regardless of which page is mounted.
+  const calMounted = !!document.getElementById('calendarTitle');
+  if (calMounted) {
+    if(calView==='week'){renderCalWeek();}
+    else if(calView==='day'){renderCalDay();}
+    else {renderCalMonth();}
+  }
+  renderUpcoming();
 }
 
 function renderCalMonth(){
