@@ -7342,7 +7342,7 @@ function renderWNotes(){
   const currentNotes = wJournalViewOpen ? [] : (wSelectedFolderId==='UNFILED' ? wUnfiledNotes() : wNotesInFolder(wSelectedFolderId));
 
   document.getElementById('workContent').innerHTML = `
-    <div style="display:flex;gap:12px;height:100%;margin:-28px -32px;padding:16px 20px">
+    <div style="display:flex;gap:12px;height:calc(100% + 56px);margin:-28px -32px;padding:16px 20px;box-sizing:border-box">
       <div style="width:190px;flex-shrink:0;overflow-y:auto;padding-right:8px">
         <div onclick="wOpenJournal()" style="display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:10px;${wJournalViewOpen?'background:rgba(245,158,11,.12)':''};border:1px solid rgba(110,145,210,.12)">
           <span>📓</span><span style="font-size:13px;font-weight:700;color:${wJournalViewOpen?'var(--amber)':'var(--text)'}">Daily Journal</span>
