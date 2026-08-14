@@ -7422,7 +7422,7 @@ function renderWToday() {
               ${t.source==='jobsmetrix'?'<span style="font-size:9px;font-weight:800;background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 5px;border-radius:5px;border:1px solid rgba(245,158,11,.3)">JM</span>':''}
               <span style="font-size:13px;font-weight:600">${wEsc(t.title)}</span>
             </div>
-            ${t.note?`<div style="font-size:11px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(t.note)}</div>`:''}
+            ${t.note?`<div style="font-size:12px;color:#c3d0e8;margin-top:2px">${wEsc(t.note)}</div>`:''}
           </div>
           <button onclick="wDeleteTask(${t.id})" style="color:rgba(110,145,210,.3);font-size:16px;background:none;border:none;cursor:pointer">×</button>
         </div>`).join('')}
