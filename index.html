@@ -187,6 +187,9 @@
 .event-chip.tl-kythros{background:rgba(251,146,60,.15);border-color:rgba(251,146,60,.3);color:#fed7aa}.month-nav{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
     .split{display:grid;grid-template-columns:300px 1fr;gap:16px}.note-list,.recipe-list{display:flex;flex-direction:column;gap:10px;max-height:760px;overflow:auto}.note-item,.recipe-item{background:rgba(var(--surface2-rgb),.78);border:1px solid rgba(110,145,210,.18);border-radius:14px;padding:14px;cursor:pointer}.note-item.active,.recipe-item.active{background:rgba(77,141,255,.12);border-color:rgba(77,141,255,.45)}
     .note-toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:rgba(var(--panel3-rgb),.7);border:1px solid var(--line);padding:6px 12px;border-radius:12px}.tool-group{display:flex;gap:6px;align-items:center}.note-toolbar .btn{padding:6px 10px;font-size:.8rem;min-width:0}.note-toolbar input[type=range]{width:56px}.note-canvas-wrap{position:relative;background:#10151f;border-radius:18px;border:1px solid rgba(110,145,210,.22);overflow:hidden;min-height:860px;background-image:linear-gradient(to bottom, rgba(148,178,235,.16) 1px, transparent 1px), linear-gradient(to right, rgba(232,120,120,.18) 1px, transparent 1px);background-size:100% 38px, 1px 100%;background-position:0 30px, 52px 0;touch-action:none}.note-header-bar{position:absolute;top:0;left:0;right:0;height:30px;background:rgba(20,26,38,.75);border-bottom:1px solid rgba(148,178,235,.12)}.note-canvas{position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;display:block}.note-page-overlay{position:absolute;left:0;right:0;bottom:0;height:56px;background:linear-gradient(180deg, rgba(16,21,31,0), rgba(16,21,31,.92));pointer-events:none}
+    body.wFocusActive #topbarGlobal{display:none}
+    body.wFocusActive #workNavSidebar{display:none}
+    body.wFocusActive .app{padding:6px}
     .recipes-layout{display:grid;grid-template-columns:320px 1.1fr .9fr;gap:16px}.mealplan-table td,.mealplan-table th{padding:10px}.grocery-list{display:flex;flex-direction:column;gap:8px}.grocery-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid rgba(110,145,210,.15);background:rgba(var(--surface2-rgb),.72);border-radius:12px}.checkrow{display:flex;align-items:center;gap:10px}
     .status-badge{padding:8px 12px;border-radius:999px;border:1px solid var(--line);font-size:.82rem}.status-ok{background:rgba(29,187,135,.16);color:#a3f2d2}.status-warn{background:rgba(243,179,61,.16);color:#ffe09d}.status-bad{background:rgba(239,83,80,.16);color:#ffc0be}
     .modal-overlay{display:none;position:fixed;inset:0;background:rgba(1,5,10,.75);z-index:9999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}.modal-overlay.open{display:flex}.modal-box{background:rgba(var(--modal-rgb),.98);border:1px solid rgba(110,145,210,.2);border-radius:22px;width:min(940px,calc(100vw - 24px));margin:auto;box-shadow:0 30px 80px rgba(0,0,0,.45);color:var(--text)}.modal-head,.modal-body,.modal-foot{padding:18px}.modal-head{border-bottom:1px solid rgba(110,145,210,.16);display:flex;justify-content:space-between;align-items:center;gap:10px}.modal-foot{border-top:1px solid rgba(110,145,210,.16);display:flex;justify-content:flex-end;gap:10px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.full{grid-column:1/-1}.small{font-size:.86rem}.budget-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.good{color:#a3f2d2}.bad{color:#ffc0be}
@@ -354,7 +357,7 @@
   </div>
 </div>
 <div class="app">
-  <div class="topbar">
+  <div class="topbar" id="topbarGlobal">
     <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.3 · 14/Aug/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
@@ -6641,7 +6644,7 @@ try{ initFirebase(); }catch(e){ console.error('Firebase init failed:',e); render
   <div style="display:flex;height:100%">
 
     <!-- Work nav -->
-    <div style="width:200px;flex-shrink:0;background:var(--surface);border-right:1px solid rgba(110,145,210,.12);display:flex;flex-direction:column;padding:16px 10px">
+    <div id="workNavSidebar" style="width:200px;flex-shrink:0;background:var(--surface);border-right:1px solid rgba(110,145,210,.12);display:flex;flex-direction:column;padding:16px 10px">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:rgba(110,145,210,.5);padding:4px 8px 12px;text-transform:uppercase">Work</div>
       <button class="work-nav active" data-wpage="wToday" onclick="workNav('wToday',this)">☀️ &nbsp;Today</button>
       <button class="work-nav" data-wpage="wPriorities" onclick="workNav('wPriorities',this)">◎ &nbsp;Priorities & Pulse</button>
@@ -7010,6 +7013,18 @@ let wDrawing = false;
 let wCurrentStroke = null;
 let wLastPoint = null;
 let wNoteCanvas = null, wNoteCtx = null;
+let wFocusMode = false;
+
+// Focus Mode: hides the global header and the Work nav sidebar (via
+// CSS class on <body>) and skips rendering the Notes folder sidebar
+// entirely (in renderWNotes() below) -- leaves just the toolbar and
+// canvas, full width. The toggle button itself stays in the toolbar
+// in both states so there's always a visible way back.
+function wToggleFocusMode(){
+  wFocusMode = !wFocusMode;
+  document.body.classList.toggle('wFocusActive', wFocusMode);
+  renderWNotes();
+}
 
 const W_FOLDER_COLORS = ['#8b5cf6','#3b82f6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#6b7280'];
 
@@ -7305,6 +7320,7 @@ function wRenderNoteEditor(){
       <div class="tool-group"><span class="small muted" title="Eraser size">⚪</span><input id="wEraserSize" type="range" min="4" max="26" value="12" style="padding:0;border:none;background:transparent" /></div>
       <div class="tool-group"><input id="wBrushColor" type="color" value="#ffffff" style="width:32px;height:32px;padding:2px" title="Color" /></div>
       <div class="tool-group"><button class="btn" onclick="wUndoStroke()" title="Undo">↩️</button><button class="btn btn-danger" onclick="wClearCanvas()" title="Clear Page">🗑️</button></div>
+      <div class="tool-group" style="margin-left:auto"><button class="btn" onclick="wToggleFocusMode()" title="Toggle Focus Mode">${wFocusMode?'✕ Exit Focus':'⛶ Focus'}</button></div>
     </div>
     <div class="note-canvas-wrap" id="wNoteCanvasWrap" style="margin-bottom:8px;flex:1;min-height:300px"><div class="note-header-bar"></div><canvas id="wNoteCanvas" class="note-canvas"></canvas><div class="note-page-overlay"></div></div>
     <textarea id="wNoteBody" placeholder="Optional typed notes under the handwriting page..." style="min-height:44px;flex-shrink:0">${wEsc(note?note.body:'')}</textarea>
@@ -7341,8 +7357,7 @@ function renderWNotes(){
   const unfiledCount = wUnfiledNotes().length;
   const currentNotes = wJournalViewOpen ? [] : (wSelectedFolderId==='UNFILED' ? wUnfiledNotes() : wNotesInFolder(wSelectedFolderId));
 
-  document.getElementById('workContent').innerHTML = `
-    <div style="display:flex;gap:12px;height:calc(100% + 56px);margin:-28px -32px;padding:16px 20px;box-sizing:border-box">
+  const wSidebarHtml = wFocusMode ? '' : `
       <div style="width:190px;flex-shrink:0;overflow-y:auto;padding-right:8px">
         <div onclick="wOpenJournal()" style="display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:10px;${wJournalViewOpen?'background:rgba(245,158,11,.12)':''};border:1px solid rgba(110,145,210,.12)">
           <span>📓</span><span style="font-size:13px;font-weight:700;color:${wJournalViewOpen?'var(--amber)':'var(--text)'}">Daily Journal</span>
@@ -7365,7 +7380,11 @@ function renderWNotes(){
             <div class="small muted" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wEsc((n.body||'').slice(0,60)||'Handwritten note')}</div>
           </div>`).join('') || '<div class="small muted" style="padding:6px 8px">No notes here yet.</div>'}
         </div>`}
-      </div>
+      </div>`;
+
+  document.getElementById('workContent').innerHTML = `
+    <div style="display:flex;gap:12px;height:calc(100% + 56px);margin:-28px -32px;padding:16px 20px;box-sizing:border-box">
+      ${wSidebarHtml}
       <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
         ${wJournalViewOpen ? wRenderJournalView() : wRenderNoteEditor()}
       </div>
