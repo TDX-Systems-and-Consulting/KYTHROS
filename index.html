@@ -6647,6 +6647,7 @@ try{ initFirebase(); }catch(e){ console.error('Firebase init failed:',e); render
       <button class="work-nav" data-wpage="wPriorities" onclick="workNav('wPriorities',this)">◎ &nbsp;Priorities & Pulse</button>
       <button class="work-nav" data-wpage="wKanban" onclick="workNav('wKanban',this)">▥ &nbsp;Office Kanban</button>
       <button class="work-nav" data-wpage="wLeadership" onclick="workNav('wLeadership',this)">🧭 &nbsp;Leadership Sync</button>
+      <button class="work-nav" data-wpage="wNotes" onclick="workNav('wNotes',this)">📝 &nbsp;Notes</button>
       <button class="work-nav" data-wpage="wCalendar" onclick="workNavCalendar(this)">📅 &nbsp;Calendar</button>
       <div style="margin-top:auto;padding:8px;border-top:1px solid rgba(110,145,210,.1)">
         <div style="font-size:10px;color:rgba(110,145,210,.4);text-align:center">Work tasks are separate<br>from Personal</div>
@@ -6845,7 +6846,16 @@ let workState = {
     ],
     todos: [],
     history: [],
-  }
+  },
+  // Work Notes — completely separate from Personal notes (state.notes),
+  // same "Work stays separate from Personal" principle as everything
+  // else in workState. Nested folders (parentId chains up to a root
+  // folder, or null for a top-level folder) so a top-level folder can
+  // represent a job address with sub-folders underneath it. Journal
+  // entries are a distinct, append-only running log, not a folder note.
+  notes: [],
+  noteFolders: [],
+  journalEntries: [],
 };
 
 let currentWorkPage = 'wToday';
@@ -6973,13 +6983,396 @@ window.workNavCalendar = workNavCalendar;
 // data and needs the visible page to reflect it immediately —
 // deleting a blocker or pulse metric from the Today page, for
 // instance, shouldn't require also being on the Priorities page.
-const WORK_PAGE_RENDERS = { wToday: renderWToday, wPriorities: renderWPriorities, wKanban: renderWKanban, wLeadership: renderWLeadershipSync };
+const WORK_PAGE_RENDERS = { wToday: renderWToday, wPriorities: renderWPriorities, wKanban: renderWKanban, wLeadership: renderWLeadershipSync, wNotes: renderWNotes };
 function wRenderCurrentPage() {
   (WORK_PAGE_RENDERS[currentWorkPage] || renderWToday)();
 }
 
 function wEsc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════════════
+// WORK: NOTES (folders + handwriting + journal)
+// Completely separate canvas/state pipeline from Personal Notes --
+// duplicated rather than shared on purpose, same reasoning as workState
+// itself being a separate object: zero risk of Work and Personal
+// drawing state ever colliding, and this canvas element gets destroyed
+// and recreated on every workNav() call (innerHTML replace), unlike
+// Personal's canvas which is static and wired up once at page load.
+// ═══════════════════════════════════════
+let wSelectedNoteId = null;
+let wSelectedFolderId = 'UNFILED'; // 'UNFILED' is a sentinel bucket, not a real folder id
+let wJournalViewOpen = false;
+let wExpandedFolders = new Set();
+let wCurrentTool = 'pen';
+let wDrawing = false;
+let wCurrentStroke = null;
+let wLastPoint = null;
+let wNoteCanvas = null, wNoteCtx = null;
+
+const W_FOLDER_COLORS = ['#8b5cf6','#3b82f6','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#6b7280'];
+
+// -- Folder data helpers --
+function wFolderChildren(parentId){ return workState.noteFolders.filter(f=>f.parentId===parentId); }
+function wFolderById(id){ return workState.noteFolders.find(f=>f.id===id)||null; }
+function wNotesInFolder(folderId){ return workState.notes.filter(n=>(n.folderId||null)===folderId); }
+function wUnfiledNotes(){ return workState.notes.filter(n=>!n.folderId); }
+
+// -- Folder CRUD --
+function wCreateFolder(parentId){
+  const name = prompt(parentId ? 'New sub-folder name:' : 'New folder name (e.g. a job address):');
+  if(!name || !name.trim()) return;
+  const folder = { id: uid('wfolder'), name: name.trim(), color: W_FOLDER_COLORS[workState.noteFolders.length % W_FOLDER_COLORS.length], parentId: parentId||null };
+  workState.noteFolders.push(folder);
+  if(parentId) wExpandedFolders.add(parentId);
+  scheduleWorkSave();
+  renderWNotes();
+}
+function wRenameFolder(id){
+  const folder = wFolderById(id); if(!folder) return;
+  const name = prompt('Rename folder:', folder.name);
+  if(!name || !name.trim()) return;
+  folder.name = name.trim();
+  scheduleWorkSave();
+  renderWNotes();
+}
+function wDeleteFolder(id){
+  const folder = wFolderById(id); if(!folder) return;
+  const childCount = wFolderChildren(id).length;
+  const noteCount = wNotesInFolder(id).length;
+  if(!confirm(`Delete "${folder.name}"? ${noteCount} note(s) and ${childCount} sub-folder(s) here will move up one level instead of being deleted.`)) return;
+  // Never cascade-delete notes -- reparent this folder's direct notes
+  // and sub-folders up to ITS OWN parent instead.
+  workState.notes.forEach(n=>{ if(n.folderId===id) n.folderId = folder.parentId; });
+  workState.noteFolders.forEach(f=>{ if(f.parentId===id) f.parentId = folder.parentId; });
+  workState.noteFolders = workState.noteFolders.filter(f=>f.id!==id);
+  if(wSelectedFolderId===id) wSelectedFolderId = folder.parentId||'UNFILED';
+  scheduleWorkSave();
+  renderWNotes();
+}
+function wSetFolderColor(id, color){
+  const folder = wFolderById(id); if(!folder) return;
+  folder.color = color;
+  scheduleWorkSave();
+  renderWNotes();
+}
+function wSelectFolder(id){
+  wSelectedFolderId = id;
+  wJournalViewOpen = false;
+  renderWNotes();
+}
+function wToggleFolderExpand(id, ev){
+  if(ev) ev.stopPropagation();
+  if(wExpandedFolders.has(id)) wExpandedFolders.delete(id); else wExpandedFolders.add(id);
+  renderWNotes();
+}
+
+// -- Note CRUD --
+function wSelectedNote(){ return workState.notes.find(n=>n.id===wSelectedNoteId)||null; }
+function wCreateNote(){
+  const folderId = (wSelectedFolderId==='UNFILED') ? null : wSelectedFolderId;
+  const note = { id: uid('wnote'), title:'New Note', body:'', strokes:[], folderId, updatedAt: new Date().toISOString() };
+  workState.notes.unshift(note);
+  wSelectedNoteId = note.id;
+  wJournalViewOpen = false;
+  scheduleWorkSave();
+  renderWNotes();
+}
+function wSelectNote(id){
+  wSelectedNoteId = id;
+  wJournalViewOpen = false;
+  renderWNotes();
+}
+function wSaveCurrentNote(){
+  let note = wSelectedNote();
+  if(!note){ wCreateNote(); note = wSelectedNote(); }
+  const titleEl = document.getElementById('wNoteTitle');
+  const bodyEl = document.getElementById('wNoteBody');
+  note.title = (titleEl?titleEl.value.trim():'') || 'Untitled Note';
+  note.body = bodyEl?bodyEl.value:'';
+  note.updatedAt = new Date().toISOString();
+  scheduleWorkSave();
+  renderWNotes();
+}
+function wDeleteCurrentNote(){
+  if(!wSelectedNoteId || !confirm('Delete this note?')) return;
+  workState.notes = workState.notes.filter(n=>n.id!==wSelectedNoteId);
+  wSelectedNoteId = null;
+  scheduleWorkSave();
+  renderWNotes();
+}
+
+// -- Canvas drawing pipeline (mirrors Personal's exactly, own state) --
+function wGetCurrentBrushSize(){
+  const eraserEl = document.getElementById('wEraserSize');
+  const penEl = document.getElementById('wPenSize');
+  return wCurrentTool==='eraser' ? Number(eraserEl?eraserEl.value:12) : Number(penEl?penEl.value:3);
+}
+function wResizeCanvas(){
+  if(!wNoteCanvas) return;
+  const wrap = document.getElementById('wNoteCanvasWrap');
+  if(!wrap) return;
+  const ratio = window.devicePixelRatio||1;
+  const rect = wrap.getBoundingClientRect();
+  wNoteCanvas.width = Math.max(300, Math.floor(rect.width*ratio));
+  wNoteCanvas.height = Math.max(500, Math.floor(rect.height*ratio));
+  wNoteCanvas.style.width = rect.width+'px';
+  wNoteCanvas.style.height = rect.height+'px';
+  wNoteCtx.setTransform(ratio,0,0,ratio,0,0);
+  wNoteCtx.lineCap='round'; wNoteCtx.lineJoin='round';
+}
+function wSetupStrokeStyle(stroke, pressure){
+  wNoteCtx.globalCompositeOperation = stroke.tool==='eraser' ? 'destination-out' : 'source-over';
+  wNoteCtx.strokeStyle = stroke.tool==='eraser' ? 'rgba(0,0,0,1)' : (stroke.color||'#111');
+  const base = Number(stroke.size||3);
+  const p = (typeof pressure==='number') ? pressure : 1;
+  wNoteCtx.lineWidth = stroke.tool==='eraser' ? base : Math.max(base*0.4, base*p);
+}
+function wRedrawCurrentNote(){
+  if(!wNoteCtx||!wNoteCanvas) return;
+  wNoteCtx.clearRect(0,0,wNoteCanvas.width,wNoteCanvas.height);
+  const note = wSelectedNote();
+  ((note&&note.strokes)||[]).forEach(stroke=>{
+    if(!(stroke.points&&stroke.points.length)) return;
+    const pts = stroke.points;
+    if(pts.length===1){
+      wSetupStrokeStyle(stroke, pts[0].pressure);
+      wNoteCtx.beginPath(); wNoteCtx.moveTo(pts[0].x,pts[0].y); wNoteCtx.lineTo(pts[0].x+0.01,pts[0].y+0.01); wNoteCtx.stroke();
+      return;
+    }
+    for(let i=1;i<pts.length;i++){
+      wSetupStrokeStyle(stroke, pts[i].pressure);
+      wNoteCtx.beginPath(); wNoteCtx.moveTo(pts[i-1].x,pts[i-1].y); wNoteCtx.lineTo(pts[i].x,pts[i].y); wNoteCtx.stroke();
+    }
+  });
+  wNoteCtx.globalCompositeOperation='source-over';
+}
+function wCanvasPos(e){
+  const rect = wNoteCanvas.getBoundingClientRect();
+  const p = (typeof e.pressure==='number' && e.pressure>0) ? e.pressure : 1;
+  return { x:e.clientX-rect.left, y:e.clientY-rect.top, pressure:p };
+}
+function wBeginStroke(pt){
+  if(!wSelectedNoteId) wCreateNote();
+  wDrawing = true;
+  const colorEl = document.getElementById('wBrushColor');
+  wCurrentStroke = { tool:wCurrentTool, color: colorEl?colorEl.value:'#111', size:wGetCurrentBrushSize(), points:[pt] };
+  wLastPoint = pt;
+  wSetupStrokeStyle(wCurrentStroke, pt.pressure);
+  wNoteCtx.beginPath(); wNoteCtx.moveTo(pt.x,pt.y); wNoteCtx.lineTo(pt.x+0.01,pt.y+0.01); wNoteCtx.stroke();
+}
+function wAppendPoint(pt){
+  if(!wDrawing||!wCurrentStroke) return;
+  const prev = wLastPoint||pt;
+  wCurrentStroke.points.push(pt);
+  wSetupStrokeStyle(wCurrentStroke, pt.pressure);
+  wNoteCtx.beginPath(); wNoteCtx.moveTo(prev.x,prev.y); wNoteCtx.lineTo(pt.x,pt.y); wNoteCtx.stroke();
+  wLastPoint = pt;
+}
+function wFinishStroke(){
+  if(!wDrawing||!wCurrentStroke) return;
+  wDrawing = false;
+  const note = wSelectedNote();
+  if(note){
+    note.strokes = note.strokes||[];
+    note.strokes.push(wCurrentStroke);
+    note.updatedAt = new Date().toISOString();
+  }
+  wCurrentStroke = null; wLastPoint = null;
+  wNoteCtx.globalCompositeOperation='source-over';
+  scheduleWorkSave();
+  const metaEl = document.getElementById('wNoteMeta');
+  if(metaEl && note) metaEl.textContent = `Last updated ${new Date(note.updatedAt).toLocaleString()}`;
+}
+function wStartDraw(e){
+  if(e.pointerType==='touch') return;
+  if(e.pointerType && !['pen','mouse'].includes(e.pointerType)) return;
+  e.preventDefault();
+  if(wNoteCanvas.setPointerCapture) wNoteCanvas.setPointerCapture(e.pointerId);
+  wBeginStroke(wCanvasPos(e));
+}
+function wMoveDraw(e){
+  if(!wDrawing) return;
+  e.preventDefault();
+  const points = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  points.forEach(ev=>wAppendPoint(wCanvasPos(ev)));
+}
+function wEndDraw(e){
+  if(wDrawing){ e.preventDefault(); wFinishStroke(); }
+}
+function wUndoStroke(){
+  const note = wSelectedNote();
+  if(!note||!(note.strokes&&note.strokes.length)) return;
+  note.strokes.pop();
+  note.updatedAt = new Date().toISOString();
+  scheduleWorkSave();
+  wRedrawCurrentNote();
+}
+function wClearCanvas(){
+  const note = wSelectedNote();
+  if(!note||!confirm('Clear handwriting on this page?')) return;
+  note.strokes = [];
+  note.updatedAt = new Date().toISOString();
+  scheduleWorkSave();
+  wRedrawCurrentNote();
+}
+function wSetPen(){
+  wCurrentTool='pen';
+  const a=document.getElementById('wPenToolBtn'), b=document.getElementById('wEraserToolBtn');
+  if(a) a.classList.add('btn-primary'); if(b) b.classList.remove('btn-primary');
+}
+function wSetEraser(){
+  wCurrentTool='eraser';
+  const a=document.getElementById('wEraserToolBtn'), b=document.getElementById('wPenToolBtn');
+  if(a) a.classList.add('btn-primary'); if(b) b.classList.remove('btn-primary');
+}
+function wAttachCanvasListeners(){
+  wNoteCanvas = document.getElementById('wNoteCanvas');
+  if(!wNoteCanvas) return;
+  wNoteCtx = wNoteCanvas.getContext('2d');
+  wNoteCanvas.addEventListener('pointerdown', wStartDraw, {passive:false});
+  wNoteCanvas.addEventListener('pointermove', wMoveDraw, {passive:false});
+  wNoteCanvas.addEventListener('pointerup', wEndDraw, {passive:false});
+  wNoteCanvas.addEventListener('pointercancel', wEndDraw, {passive:false});
+  const nc = wNoteCanvas;
+  function wPickStylusTouch(e){
+    for(let i=0;i<e.touches.length;i++){ if(e.touches[i].touchType==='stylus') return e.touches[i]; }
+    if(e.touches.length===1 && e.touches[0].touchType===undefined) return e.touches[0];
+    return null;
+  }
+  nc.addEventListener('touchstart', function(e){ e.preventDefault(); const t=wPickStylusTouch(e); if(t){ const r=nc.getBoundingClientRect(); wBeginStroke({x:t.clientX-r.left,y:t.clientY-r.top}); } }, {passive:false});
+  nc.addEventListener('touchmove', function(e){ e.preventDefault(); const t=wPickStylusTouch(e); if(t){ const r=nc.getBoundingClientRect(); wAppendPoint({x:t.clientX-r.left,y:t.clientY-r.top}); } }, {passive:false});
+  nc.addEventListener('touchend', function(e){ e.preventDefault(); wFinishStroke(); }, {passive:false});
+  wResizeCanvas();
+  wRedrawCurrentNote();
+}
+
+// -- Journal: separate, append-only running log, not a folder note --
+function wOpenJournal(){
+  wJournalViewOpen = true;
+  wSelectedNoteId = null;
+  renderWNotes();
+}
+function wAddJournalEntry(){
+  const input = document.getElementById('wJournalInput');
+  const text = input ? input.value.trim() : '';
+  if(!text) return;
+  const entry = { id: uid('wjournal'), text, createdAt: new Date().toISOString() };
+  workState.journalEntries.unshift(entry);
+  if(input) input.value='';
+  scheduleWorkSave();
+  renderWNotes();
+}
+function wDeleteJournalEntry(id){
+  if(!confirm('Delete this journal entry?')) return;
+  workState.journalEntries = workState.journalEntries.filter(e=>e.id!==id);
+  scheduleWorkSave();
+  renderWNotes();
+}
+
+// -- Rendering --
+function wRenderFolderTree(parentId, depth){
+  const children = wFolderChildren(parentId);
+  if(!children.length) return '';
+  return children.map(f=>{
+    const hasKids = wFolderChildren(f.id).length>0;
+    const expanded = wExpandedFolders.has(f.id);
+    const active = wSelectedFolderId===f.id;
+    return `
+      <div>
+        <div onclick="wSelectFolder('${f.id}')" style="display:flex;align-items:center;gap:6px;padding:7px 8px;padding-left:${8+depth*16}px;border-radius:8px;cursor:pointer;${active?'background:rgba(245,158,11,.12)':''}">
+          ${hasKids?`<span onclick="wToggleFolderExpand('${f.id}',event)" style="font-size:10px;color:rgba(110,145,210,.5);width:12px;cursor:pointer">${expanded?'▾':'▸'}</span>`:'<span style="width:12px"></span>'}
+          <span style="width:9px;height:9px;border-radius:50%;background:${f.color};flex-shrink:0"></span>
+          <span style="flex:1;font-size:13px;font-weight:${active?'700':'500'};color:${active?'var(--amber)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wEsc(f.name)}</span>
+          <span style="font-size:10px;color:rgba(110,145,210,.4)">${wNotesInFolder(f.id).length}</span>
+          <span onclick="wCreateFolder('${f.id}');event.stopPropagation()" title="Add sub-folder" style="font-size:12px;color:rgba(110,145,210,.4);cursor:pointer;padding:2px">+</span>
+          <span onclick="wRenameFolder('${f.id}');event.stopPropagation()" title="Rename" style="font-size:11px;color:rgba(110,145,210,.4);cursor:pointer;padding:2px">✏️</span>
+          <span onclick="wDeleteFolder('${f.id}');event.stopPropagation()" title="Delete" style="font-size:11px;color:rgba(239,83,80,.5);cursor:pointer;padding:2px">🗑</span>
+        </div>
+        ${expanded?wRenderFolderTree(f.id, depth+1):''}
+      </div>`;
+  }).join('');
+}
+
+function wRenderNoteEditor(){
+  const note = wSelectedNote();
+  return `
+    <input id="wNoteTitle" placeholder="Note title" value="${wEsc(note?note.title:'')}" style="margin-bottom:12px" />
+    <div class="note-toolbar" style="margin-bottom:12px">
+      <div class="tool-group"><button class="btn btn-primary" id="wPenToolBtn" onclick="wSetPen()">Pen</button><button class="btn" id="wEraserToolBtn" onclick="wSetEraser()">Eraser</button></div>
+      <div class="tool-group"><label class="small muted">Pen</label><input id="wPenSize" type="range" min="1" max="10" value="3" style="width:110px;padding:0;border:none;background:transparent" /></div>
+      <div class="tool-group"><label class="small muted">Eraser</label><input id="wEraserSize" type="range" min="4" max="26" value="12" style="width:110px;padding:0;border:none;background:transparent" /></div>
+      <div class="tool-group"><label class="small muted">Color</label><input id="wBrushColor" type="color" value="#111111" style="width:44px;height:32px;padding:2px" /></div>
+      <div class="tool-group"><button class="btn" onclick="wUndoStroke()">Undo</button><button class="btn btn-danger" onclick="wClearCanvas()">Clear Page</button></div>
+    </div>
+    <div class="note-canvas-wrap" id="wNoteCanvasWrap" style="margin-bottom:12px"><div class="note-header-bar"></div><canvas id="wNoteCanvas" class="note-canvas"></canvas><div class="note-page-overlay"></div></div>
+    <textarea id="wNoteBody" placeholder="Optional typed notes under the handwriting page...">${wEsc(note?note.body:'')}</textarea>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-green" onclick="wSaveCurrentNote()">Save Note</button>
+      <button class="btn btn-danger" onclick="wDeleteCurrentNote()">Delete Note</button>
+    </div>
+    <div class="small muted" style="margin-top:8px" id="wNoteMeta">${note?`Last updated ${new Date(note.updatedAt).toLocaleString()}`:'No note selected.'}</div>
+  `;
+}
+
+function wRenderJournalView(){
+  const entries = workState.journalEntries;
+  return `
+    <div style="margin-bottom:16px">
+      <div style="font-size:16px;font-weight:800;margin-bottom:10px">📓 Daily Journal</div>
+      <textarea id="wJournalInput" placeholder="Write today's entry..." rows="4" style="width:100%;margin-bottom:8px"></textarea>
+      <button class="btn btn-primary" onclick="wAddJournalEntry()">Add Entry</button>
+    </div>
+    <div>
+      ${entries.length?entries.map(e=>`
+        <div class="w-card" style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+            <div style="font-size:11px;color:rgba(110,145,210,.5);font-weight:700">${new Date(e.createdAt).toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>
+            <span onclick="wDeleteJournalEntry('${e.id}')" style="font-size:11px;color:rgba(239,83,80,.5);cursor:pointer">🗑</span>
+          </div>
+          <div style="margin-top:6px;white-space:pre-wrap;font-size:13px;line-height:1.6">${wEsc(e.text)}</div>
+        </div>`).join(''):'<div class="muted">No journal entries yet. Write your first one above.</div>'}
+    </div>
+  `;
+}
+
+function renderWNotes(){
+  const unfiledCount = wUnfiledNotes().length;
+  const currentNotes = wJournalViewOpen ? [] : (wSelectedFolderId==='UNFILED' ? wUnfiledNotes() : wNotesInFolder(wSelectedFolderId));
+
+  document.getElementById('workContent').innerHTML = `
+    <div style="display:flex;gap:20px;height:100%">
+      <div style="width:260px;flex-shrink:0;overflow-y:auto;padding-right:8px">
+        <div onclick="wOpenJournal()" style="display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:10px;${wJournalViewOpen?'background:rgba(245,158,11,.12)':''};border:1px solid rgba(110,145,210,.12)">
+          <span>📓</span><span style="font-size:13px;font-weight:700;color:${wJournalViewOpen?'var(--amber)':'var(--text)'}">Daily Journal</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:rgba(110,145,210,.5);text-transform:uppercase">Folders</div>
+          <button class="btn" style="padding:2px 8px;font-size:11px" onclick="wCreateFolder(null)">+ Folder</button>
+        </div>
+        <div style="margin-bottom:10px">${wRenderFolderTree(null,0) || '<div class="small muted" style="padding:6px 8px">No folders yet. Add one for a job address.</div>'}</div>
+        <div onclick="wSelectFolder('UNFILED')" style="display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer;${(!wJournalViewOpen&&wSelectedFolderId==='UNFILED')?'background:rgba(245,158,11,.12)':''}">
+          <span style="width:9px;height:9px;border-radius:50%;background:rgba(110,145,210,.3);flex-shrink:0"></span>
+          <span style="flex:1;font-size:13px;font-weight:600">Unfiled Notes</span>
+          <span style="font-size:10px;color:rgba(110,145,210,.4)">${unfiledCount}</span>
+        </div>
+        ${wJournalViewOpen?'':`
+        <div style="margin-top:14px">
+          <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="wCreateNote()">+ New Note</button>
+          ${currentNotes.map(n=>`<div onclick="wSelectNote('${n.id}')" style="padding:8px 10px;border-radius:8px;cursor:pointer;margin-bottom:4px;${n.id===wSelectedNoteId?'background:rgba(245,158,11,.12)':''}">
+            <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wEsc(n.title||'Untitled Note')}</div>
+            <div class="small muted" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${wEsc((n.body||'').slice(0,60)||'Handwritten note')}</div>
+          </div>`).join('') || '<div class="small muted" style="padding:6px 8px">No notes here yet.</div>'}
+        </div>`}
+      </div>
+      <div style="flex:1;overflow-y:auto">
+        ${wJournalViewOpen ? wRenderJournalView() : wRenderNoteEditor()}
+      </div>
+    </div>
+  `;
+
+  if(!wJournalViewOpen) wAttachCanvasListeners();
 }
 
 // ═══════════════════════════════════════
