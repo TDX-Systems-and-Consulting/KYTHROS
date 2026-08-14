@@ -280,6 +280,12 @@
     .cw-cell.today-col{background:rgba(77,141,255,.04)}
     .cw-cell.now-row{background:rgba(77,141,255,.06)}
     .cal-now-line{position:absolute;left:0;right:0;height:2px;background:var(--red);z-index:2}
+    .cal-day-col{position:relative;flex:1;min-width:0;border-right:1px solid rgba(110,145,210,.08)}
+    .cal-hour-bg{height:52px;border-bottom:1px solid rgba(110,145,210,.08);background:rgba(var(--surface2-rgb),.5)}
+    .cal-hour-bg.today-col{background:rgba(77,141,255,.04)}
+    .cal-event-block{position:absolute;border-radius:6px;padding:3px 6px;overflow:hidden;cursor:pointer;color:#fff;font-size:.72rem;line-height:1.25;box-sizing:border-box}
+    .cal-event-block .ceb-title{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cal-event-block .ceb-time{font-size:.65rem;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .cal-view-tabs{display:flex;gap:6px;margin-bottom:12px}
     .cal-view-tab{background:rgba(var(--surface2-rgb),.8);border:1px solid rgba(110,145,210,.18);color:var(--muted);padding:7px 14px;border-radius:10px;cursor:pointer;font-size:.84rem;font-weight:600}
     .cal-view-tab.active{background:linear-gradient(180deg,var(--blue),var(--blue2));color:#fff;border-color:rgba(255,255,255,.08)}
@@ -6343,6 +6349,72 @@ function renderCalMonth(){
   document.getElementById('calendarGrid').innerHTML=cells;
 }
 
+// Row height in px -- must match .cal-hour-bg{height:52px} above.
+const CAL_ROW_H = 52;
+
+function calTimeToMinutes(hhmm){
+  if(!hhmm)return null;
+  const parts=hhmm.split(':');
+  const h=Number(parts[0]),m=Number(parts[1]||0);
+  if(isNaN(h))return null;
+  return h*60+m;
+}
+
+// Computes {top,height} in px for one event within a grid spanning
+// gridStartHour..gridEndHour. Clamps to the visible range so an event
+// starting before/after the grid doesn't produce a wild offset.
+// Enforces an 18px floor so very short events stay tappable/readable.
+function calComputeBlock(ev,gridStartHour,gridEndHour){
+  const startMin=calTimeToMinutes(ev.startTime);
+  if(startMin===null)return null;
+  let endMin=calTimeToMinutes(ev.endTime);
+  if(endMin===null||endMin<=startMin)endMin=startMin+30;
+  const gridStartMin=gridStartHour*60,gridEndMin=gridEndHour*60;
+  const clampedStart=Math.max(startMin,gridStartMin);
+  const clampedEnd=Math.min(endMin,gridEndMin);
+  if(clampedEnd<=clampedStart)return null;
+  const top=((clampedStart-gridStartMin)/60)*CAL_ROW_H;
+  const height=Math.max(((clampedEnd-clampedStart)/60)*CAL_ROW_H,18);
+  return{top,height};
+}
+
+// Greedy column-packing for same-day overlapping events: sort by
+// start time, place each in the first column whose last event has
+// already ended, otherwise open a new column. Standard side-by-side
+// calendar layout approach.
+function calAssignColumns(dayEvents){
+  const withTimes=dayEvents.map(e=>{
+    const s=calTimeToMinutes(e.startTime);
+    let en=calTimeToMinutes(e.endTime);
+    if(en===null||en<=s)en=s+30;
+    return{ev:e,start:s,end:en};
+  }).sort((a,b)=>a.start-b.start);
+  const columns=[];
+  withTimes.forEach(item=>{
+    let placed=false;
+    for(let c=0;c<columns.length;c++){
+      if(columns[c]<=item.start){columns[c]=item.end;item.col=c;placed=true;break;}
+    }
+    if(!placed){item.col=columns.length;columns.push(item.end);}
+  });
+  const totalCols=columns.length;
+  return withTimes.map(item=>({ev:item.ev,col:item.col,totalCols}));
+}
+
+// Renders one day's timed events as absolutely-positioned duration
+// blocks inside a .cal-day-col of the given pixel height.
+function calRenderEventBlocks(dayEvents,gridStartHour,gridEndHour){
+  const placed=calAssignColumns(dayEvents);
+  return placed.map(({ev,col,totalCols})=>{
+    const block=calComputeBlock(ev,gridStartHour,gridEndHour);
+    if(!block)return'';
+    const colWidth=100/totalCols;
+    const col_=getEventColor(ev);
+    const timeLabel=ev.endTime?`${fmt12h(ev.startTime)} – ${fmt12h(ev.endTime)}`:fmt12h(ev.startTime);
+    return`<div class="cal-event-block" style="top:${block.top}px;height:${block.height}px;left:calc(${col*colWidth}% + 2px);width:calc(${colWidth}% - 4px);background:${col_}cc;border:1px solid ${col_}" onclick="openEvent('${ev.id}','${ev.source}')" title="${esc(ev.title)}"><div class="ceb-title">${esc(ev.title)}</div>${block.height>=32?`<div class="ceb-time">${timeLabel}</div>`:''}</div>`;
+  }).join('');
+}
+
 function renderCalWeek(){
   const grid=document.getElementById('calWeekGrid');if(!grid)return;
   // Find Monday of the week containing calendarDate
@@ -6355,34 +6427,40 @@ function renderCalWeek(){
   const today=todayISO();
   const dayLabels=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const events=allCalendarEvents();
-  const hours=Array.from({length:17},(_,i)=>i+6); // 6am–10pm
+  const gridStartHour=6,gridEndHour=23; // 6am–10pm visible range
+  const hours=Array.from({length:gridEndHour-gridStartHour},(_,i)=>i+gridStartHour);
   const now=new Date();
   const nowHour=now.getHours()+(now.getMinutes()/60);
-  let html=`<div class="cal-week-grid">`;
-  // Header row
-  html+=`<div class="cwh" style="font-size:.65rem;color:var(--muted)">Time</div>`;
+  const totalHeight=hours.length*CAL_ROW_H;
+
+  let html=`<div style="border:1px solid rgba(110,145,210,.16);border-radius:16px;overflow:hidden">`;
+  // Header row (day names/dates)
+  html+=`<div style="display:flex"><div class="cwh" style="width:52px;flex-shrink:0;font-size:.65rem;color:var(--muted)">Time</div>`;
   weekDays.forEach((d,i)=>{
     const dt=new Date(d+'T00:00:00');
-    html+=`<div class="cwh ${d===today?'today-col':''}">${dayLabels[i]}<br><span style="font-size:1.1rem;font-weight:900">${dt.getDate()}</span></div>`;
-  });
-  // All-day row
-  html+=`<div class="cwh" style="font-size:.65rem;color:var(--muted)">All day</div>`;
-  weekDays.forEach(d=>{
-    const allDay=events.filter(e=>e.date===d&&!e.startTime);
-    html+=`<div class="cw-cell ${d===today?'today-col':''}" style="min-height:30px;padding:4px">${allDay.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}22;border:1px solid ${col}44;color:${col}" onclick="openEvent('${e.id}','${e.source}')">${esc(e.title)}</span>`;}).join('')}<button onclick="openFamilyEventOnDate && openFamilyEventOnDate('${d}','')" style="border:none;background:transparent;cursor:pointer;color:rgba(110,145,210,.3);font-size:1rem;width:100%;text-align:center" onclick="newEventOnDate('${d}')">+</button></div>`;
-  });
-  // Hour rows
-  hours.forEach(h=>{
-    const label=h===12?'12pm':h<12?h+'am':(h-12)+'pm';
-    const isNowRow=d===today&&nowHour>=h&&nowHour<h+1;
-    html+=`<div class="cw-time">${label}</div>`;
-    weekDays.forEach(day=>{
-      const hourEvs=events.filter(e=>e.date===day&&e.startTime&&parseInt(e.startTime)===h);
-      const nowLine=(day===today&&nowHour>=h&&nowHour<h+1)?`<div class="cal-now-line" style="top:${((nowHour-h)*100)}%"></div>`:'';;
-      html+=`<div class="cw-cell ${day===today?'today-col':''} ${isNowRow?'now-row':''}" style="position:relative">${nowLine}${hourEvs.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}22;border:1px solid ${col}44;color:${col}" onclick="openEvent('${e.id}','${e.source}')">${e.startTime} ${esc(e.title)}</span>`;}).join('')}</div>`;
-    });
+    html+=`<div class="cwh" style="flex:1;min-width:0">${dayLabels[i]}<br><span style="font-size:1.1rem;font-weight:900">${dt.getDate()}</span></div>`;
   });
   html+=`</div>`;
+  // All-day row
+  html+=`<div style="display:flex"><div class="cwh" style="width:52px;flex-shrink:0;font-size:.65rem;color:var(--muted)">All day</div>`;
+  weekDays.forEach(d=>{
+    const allDay=events.filter(e=>e.date===d&&!e.startTime);
+    html+=`<div class="cw-cell ${d===today?'today-col':''}" style="flex:1;min-width:0;min-height:30px;padding:4px">${allDay.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}22;border:1px solid ${col}44;color:${col}" onclick="openEvent('${e.id}','${e.source}')">${esc(e.title)}</span>`;}).join('')}<button onclick="openFamilyEventOnDate && openFamilyEventOnDate('${d}','')" style="border:none;background:transparent;cursor:pointer;color:rgba(110,145,210,.3);font-size:1rem;width:100%;text-align:center" onclick="newEventOnDate('${d}')">+</button></div>`;
+  });
+  html+=`</div>`;
+  // Timed grid: fixed time-label column + one continuous day-column per day
+  html+=`<div style="display:flex">`;
+  html+=`<div style="width:52px;flex-shrink:0">${hours.map(h=>{const label=h===12?'12pm':h<12?h+'am':(h-12)+'pm';return`<div class="cw-time" style="height:${CAL_ROW_H}px;box-sizing:border-box">${label}</div>`;}).join('')}</div>`;
+  weekDays.forEach(day=>{
+    const dayTimed=events.filter(e=>e.date===day&&e.startTime);
+    const nowLine=(day===today&&nowHour>=gridStartHour&&nowHour<gridEndHour)?`<div class="cal-now-line" style="top:${((nowHour-gridStartHour)*CAL_ROW_H)}px"></div>`:'';
+    html+=`<div class="cal-day-col" style="height:${totalHeight}px">`;
+    html+=hours.map(()=>`<div class="cal-hour-bg ${day===today?'today-col':''}"></div>`).join('');
+    html+=nowLine;
+    html+=calRenderEventBlocks(dayTimed,gridStartHour,gridEndHour);
+    html+=`</div>`;
+  });
+  html+=`</div></div>`;
   grid.innerHTML=html;
 }
 
@@ -6395,24 +6473,25 @@ function renderCalDay(){
   const events=allCalendarEvents().filter(e=>e.date===iso);
   const allDay=events.filter(e=>!e.startTime);
   const timed=events.filter(e=>e.startTime);
-  const hours=Array.from({length:18},(_,i)=>i+5); // 5am–10pm
+  const gridStartHour=5,gridEndHour=23; // 5am–10pm visible range
+  const hours=Array.from({length:gridEndHour-gridStartHour},(_,i)=>i+gridStartHour);
   const now=new Date();
   const nowHour=now.getHours()+(now.getMinutes()/60);
-  let html=`<div class="cal-day-grid">`;
-  // All-day section
+  const totalHeight=hours.length*CAL_ROW_H;
+
+  let html=`<div style="border:1px solid rgba(110,145,210,.16);border-radius:16px;overflow:hidden">`;
   if(allDay.length){
-    html+=`<div class="cw-time" style="font-size:.65rem">All day</div>`;
-    html+=`<div class="cw-cell" style="min-height:auto;padding:8px">${allDay.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}22;border:1px solid ${col}44;color:${col};display:inline-block;margin-right:4px;margin-bottom:4px;white-space:normal" onclick="openEvent('${e.id}','${e.source}')">${esc(e.title)}</span>`;}).join('')}</div>`;
+    html+=`<div style="display:flex"><div class="cw-time" style="width:52px;flex-shrink:0;font-size:.65rem">All day</div>`;
+    html+=`<div class="cw-cell" style="flex:1;min-height:auto;padding:8px">${allDay.map(e=>{const col=getEventColor(e);return`<span class="cw-event" style="background:${col}22;border:1px solid ${col}44;color:${col};display:inline-block;margin-right:4px;margin-bottom:4px;white-space:normal" onclick="openEvent('${e.id}','${e.source}')">${esc(e.title)}</span>`;}).join('')}</div></div>`;
   }
-  // Hour rows
-  hours.forEach(h=>{
-    const label=h===12?'12pm':h<12?h+'am':(h-12)+'pm';
-    const hourEvs=timed.filter(e=>parseInt(e.startTime)===h);
-    const nowLine=(iso===today&&nowHour>=h&&nowHour<h+1)?`<div class="cal-now-line" style="top:${((nowHour-h)*100)}%"></div>`:'';
-    html+=`<div class="cw-time">${label}</div>`;
-    html+=`<div class="cw-cell" style="position:relative;min-height:56px">${nowLine}${hourEvs.map(e=>{const col=getEventColor(e);const locLink=e.location?`<span onclick="event.stopPropagation();openLocationInMaps('${esc(e.location).replace(/'/g,"\\'")}');" style="font-size:.75rem;opacity:.8;cursor:pointer;text-decoration:underline;text-decoration-style:dotted">📍 ${esc(e.location)}</span>`:'';return`<div style="background:${col}1c;border:1px solid ${col}44;border-radius:8px;padding:6px 10px;margin-bottom:4px;cursor:pointer;color:${col}" onclick="openEvent('${e.id}','${e.source}')"><div style="font-weight:700;font-size:.85rem">${esc(e.title)}</div><div style="display:flex;gap:8px;align-items:center;margin-top:2px">${e.startTime?`<span style="font-size:.75rem;opacity:.8">${e.startTime}${e.endTime?' – '+e.endTime:''}</span>`:''}${locLink}</div></div>`;}).join('')}</div>`;
-  });
-  html+=`</div>`;
+  const nowLine=(iso===today&&nowHour>=gridStartHour&&nowHour<gridEndHour)?`<div class="cal-now-line" style="top:${((nowHour-gridStartHour)*CAL_ROW_H)}px"></div>`:'';
+  html+=`<div style="display:flex">`;
+  html+=`<div style="width:52px;flex-shrink:0">${hours.map(h=>{const label=h===12?'12pm':h<12?h+'am':(h-12)+'pm';return`<div class="cw-time" style="height:${CAL_ROW_H}px;box-sizing:border-box">${label}</div>`;}).join('')}</div>`;
+  html+=`<div class="cal-day-col" style="height:${totalHeight}px">`;
+  html+=hours.map(()=>`<div class="cal-hour-bg ${iso===today?'today-col':''}"></div>`).join('');
+  html+=nowLine;
+  html+=calRenderEventBlocks(timed,gridStartHour,gridEndHour);
+  html+=`</div></div></div>`;
   grid.innerHTML=html;
 }
 
