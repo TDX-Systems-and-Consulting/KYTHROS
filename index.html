@@ -7298,21 +7298,21 @@ function wRenderFolderTree(parentId, depth){
 function wRenderNoteEditor(){
   const note = wSelectedNote();
   return `
-    <input id="wNoteTitle" placeholder="Note title" value="${wEsc(note?note.title:'')}" style="margin-bottom:12px" />
-    <div class="note-toolbar" style="margin-bottom:12px">
+    <input id="wNoteTitle" placeholder="Note title" value="${wEsc(note?note.title:'')}" style="margin-bottom:8px;flex-shrink:0" />
+    <div class="note-toolbar" style="margin-bottom:8px;flex-shrink:0">
       <div class="tool-group"><button class="btn btn-primary" id="wPenToolBtn" onclick="wSetPen()">Pen</button><button class="btn" id="wEraserToolBtn" onclick="wSetEraser()">Eraser</button></div>
       <div class="tool-group"><label class="small muted">Pen</label><input id="wPenSize" type="range" min="1" max="10" value="3" style="width:110px;padding:0;border:none;background:transparent" /></div>
       <div class="tool-group"><label class="small muted">Eraser</label><input id="wEraserSize" type="range" min="4" max="26" value="12" style="width:110px;padding:0;border:none;background:transparent" /></div>
       <div class="tool-group"><label class="small muted">Color</label><input id="wBrushColor" type="color" value="#111111" style="width:44px;height:32px;padding:2px" /></div>
       <div class="tool-group"><button class="btn" onclick="wUndoStroke()">Undo</button><button class="btn btn-danger" onclick="wClearCanvas()">Clear Page</button></div>
     </div>
-    <div class="note-canvas-wrap" id="wNoteCanvasWrap" style="margin-bottom:12px"><div class="note-header-bar"></div><canvas id="wNoteCanvas" class="note-canvas"></canvas><div class="note-page-overlay"></div></div>
-    <textarea id="wNoteBody" placeholder="Optional typed notes under the handwriting page...">${wEsc(note?note.body:'')}</textarea>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+    <div class="note-canvas-wrap" id="wNoteCanvasWrap" style="margin-bottom:8px;flex:1;min-height:300px"><div class="note-header-bar"></div><canvas id="wNoteCanvas" class="note-canvas"></canvas><div class="note-page-overlay"></div></div>
+    <textarea id="wNoteBody" placeholder="Optional typed notes under the handwriting page..." style="min-height:44px;flex-shrink:0">${wEsc(note?note.body:'')}</textarea>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px;flex-shrink:0">
       <button class="btn btn-green" onclick="wSaveCurrentNote()">Save Note</button>
       <button class="btn btn-danger" onclick="wDeleteCurrentNote()">Delete Note</button>
+      <span class="small muted" id="wNoteMeta">${note?`Last updated ${new Date(note.updatedAt).toLocaleString()}`:'No note selected.'}</span>
     </div>
-    <div class="small muted" style="margin-top:8px" id="wNoteMeta">${note?`Last updated ${new Date(note.updatedAt).toLocaleString()}`:'No note selected.'}</div>
   `;
 }
 
@@ -7366,7 +7366,7 @@ function renderWNotes(){
           </div>`).join('') || '<div class="small muted" style="padding:6px 8px">No notes here yet.</div>'}
         </div>`}
       </div>
-      <div style="flex:1;overflow-y:auto">
+      <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
         ${wJournalViewOpen ? wRenderJournalView() : wRenderNoteEditor()}
       </div>
     </div>
