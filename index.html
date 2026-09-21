@@ -364,7 +364,7 @@
 </div>
 <div class="app">
   <div class="topbar" id="topbarGlobal">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.3 · 14/Aug/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.4 · 30/Jul/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -6726,6 +6726,7 @@ try{ initFirebase(); }catch(e){ console.error('Firebase init failed:',e); render
     <div id="workNavSidebar" style="width:200px;flex-shrink:0;background:var(--surface);border-right:1px solid rgba(110,145,210,.12);display:flex;flex-direction:column;padding:16px 10px">
       <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:rgba(110,145,210,.5);padding:4px 8px 12px;text-transform:uppercase">Work</div>
       <button class="work-nav active" data-wpage="wToday" onclick="workNav('wToday',this)">☀️ &nbsp;Today</button>
+      <button class="work-nav" data-wpage="wMatrix" onclick="workNav('wMatrix',this)">⊞ &nbsp;Eisenhower Matrix</button>
       <button class="work-nav" data-wpage="wPriorities" onclick="workNav('wPriorities',this)">◎ &nbsp;Priorities & Pulse</button>
       <button class="work-nav" data-wpage="wKanban" onclick="workNav('wKanban',this)">▥ &nbsp;Office Kanban</button>
       <button class="work-nav" data-wpage="wLeadership" onclick="workNav('wLeadership',this)">🧭 &nbsp;Leadership Sync</button>
@@ -7065,7 +7066,7 @@ window.workNavCalendar = workNavCalendar;
 // data and needs the visible page to reflect it immediately —
 // deleting a blocker or pulse metric from the Today page, for
 // instance, shouldn't require also being on the Priorities page.
-const WORK_PAGE_RENDERS = { wToday: renderWToday, wPriorities: renderWPriorities, wKanban: renderWKanban, wLeadership: renderWLeadershipSync, wNotes: renderWNotes };
+const WORK_PAGE_RENDERS = { wToday: renderWToday, wMatrix: renderWMatrix, wPriorities: renderWPriorities, wKanban: renderWKanban, wLeadership: renderWLeadershipSync, wNotes: renderWNotes };
 function wRenderCurrentPage() {
   (WORK_PAGE_RENDERS[currentWorkPage] || renderWToday)();
 }
@@ -7493,8 +7494,8 @@ function renderWToday() {
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px">
       ${[
-        {icon:'🔴',label:`${doFirst.length} do first`,sub:'Urgent · Important',c:'rgba(239,68,68,.15)',page:'wToday'},
-        {icon:'📋',label:`${scheduled.length} scheduled`,sub:'Important · Next',c:'rgba(59,130,246,.15)',page:'wToday'},
+        {icon:'🔴',label:`${doFirst.length} do first`,sub:'Urgent · Important',c:'rgba(239,68,68,.15)',page:'wMatrix'},
+        {icon:'📋',label:`${scheduled.length} scheduled`,sub:'Important · Next',c:'rgba(59,130,246,.15)',page:'wMatrix'},
         {icon:'⚠️',label:`${workState.blockers.length} blockers`,sub:'Awaiting resolution',c:'rgba(245,158,11,.15)',page:'wPriorities'},
         {icon:'✅',label:`${health}% on track`,sub:'Quarterly priorities',c:'rgba(16,185,129,.15)',page:'wPriorities'},
       ].map(t => `
@@ -7558,6 +7559,81 @@ function renderWToday() {
         ${!workState.blockers.length ? '<div style="font-size:12px;color:rgba(110,145,210,.4);font-style:italic;text-align:center;padding:12px">No open blockers.</div>' : ''}
       </div>
     </div>`;
+}
+
+// ═══════════════════════════════════════
+// WORK: EISENHOWER MATRIX
+// ═══════════════════════════════════════
+function renderWMatrix() {
+  const quadrants = [
+    { key: 'do',       label: 'Do First',   sub: 'Urgent + Important',     color: '#ef5350', bg: 'rgba(239,83,80,.08)',   icon: '🔴' },
+    { key: 'schedule', label: 'Schedule',   sub: 'Not Urgent + Important',  color: '#4d8dff', bg: 'rgba(77,141,255,.08)',  icon: '🔵' },
+    { key: 'delegate', label: 'Delegate',   sub: 'Urgent + Not Important',  color: '#f59e0b', bg: 'rgba(245,158,11,.08)', icon: '🟡' },
+    { key: 'eliminate',label: 'Eliminate',  sub: 'Not Urgent + Not Important', color: 'rgba(110,145,210,.5)', bg: 'rgba(110,145,210,.05)', icon: '⚫' },
+  ];
+
+  const taskRow = (t, q) => {
+    const jmBadge = t.source === 'jobsmetrix'
+      ? `<span style="font-size:9px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b;padding:1px 6px;border-radius:5px;margin-right:6px">JM</span>`
+      : '';
+    return `
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid rgba(110,145,210,.08)">
+      <input type="checkbox" ${t.done ? 'checked' : ''} onchange="wToggleTask(${t.id})"
+        style="margin-top:3px;accent-color:${q.color};width:15px;height:15px;flex-shrink:0;cursor:pointer">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;${t.done ? 'text-decoration:line-through;opacity:.4' : ''}">
+          ${jmBadge}${wEsc(t.title)}
+        </div>
+        ${t.note ? `<div style="font-size:11px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(t.note)}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <select onchange="wMoveTask(${t.id}, this.value)"
+          style="background:rgba(110,145,210,.08);border:1px solid rgba(110,145,210,.15);border-radius:6px;color:rgba(110,145,210,.7);font-size:10px;padding:2px 4px;cursor:pointer">
+          <option value="">Move…</option>
+          ${quadrants.filter(x => x.key !== q.key).map(x => `<option value="${x.key}">${x.label}</option>`).join('')}
+        </select>
+        <button onclick="wDeleteTask(${t.id})" title="Delete"
+          style="background:none;border:none;color:rgba(110,145,210,.25);font-size:13px;cursor:pointer;padding:0;line-height:1">✕</button>
+      </div>
+    </div>`;
+  };
+
+  document.getElementById('workContent').innerHTML = `
+    <div style="margin-bottom:24px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:rgba(110,145,210,.5);text-transform:uppercase;margin-bottom:6px">Work Mode</div>
+      <div style="font-size:26px;font-weight:800;letter-spacing:-.5px">Eisenhower Matrix</div>
+      <div style="font-size:13px;color:rgba(110,145,210,.6);margin-top:4px">Decide what gets your attention. JOBSMETRIX actions land in Do First automatically.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      ${quadrants.map(q => {
+        const tasks = workState.tasks.filter(t => t.quadrant === q.key);
+        const active = tasks.filter(t => !t.done);
+        return `
+        <div style="background:var(--surface);border:1px solid ${q.color}30;border-radius:16px;padding:20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(110,145,210,.1)">
+            <span style="font-size:18px">${q.icon}</span>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:800;color:${q.color}">${q.label}</div>
+              <div style="font-size:10px;color:rgba(110,145,210,.4)">${q.sub}</div>
+            </div>
+            <span style="font-size:11px;font-weight:700;background:${q.bg};color:${q.color};padding:2px 8px;border-radius:20px">${active.length}</span>
+          </div>
+          ${tasks.length ? tasks.map(t => taskRow(t, q)).join('') : `<div style="font-size:12px;color:rgba(110,145,210,.3);font-style:italic;padding:12px 0">Nothing here.</div>`}
+          <button onclick="wAddTask('${q.key}')"
+            style="margin-top:12px;width:100%;padding:8px;border-radius:8px;border:1px dashed rgba(110,145,210,.2);color:rgba(110,145,210,.4);font-size:11px;background:none;cursor:pointer;transition:all .12s"
+            onmouseover="this.style.borderColor='${q.color}';this.style.color='${q.color}'"
+            onmouseout="this.style.borderColor='rgba(110,145,210,.2)';this.style.color='rgba(110,145,210,.4)'">＋ Add task</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function wMoveTask(id, quadrant) {
+  if (!quadrant) return;
+  const idx = workState.tasks.findIndex(t => t.id === id);
+  if (idx > -1) workState.tasks[idx].quadrant = quadrant;
+  scheduleWorkSave();
+  renderWMatrix();
 }
 
 // ═══════════════════════════════════════
