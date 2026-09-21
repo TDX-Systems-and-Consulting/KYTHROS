@@ -364,7 +364,7 @@
 </div>
 <div class="app">
   <div class="topbar" id="topbarGlobal">
-    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.5 · 21/Sep/2026</p>
+    <div class="brand"><h1>PlannerXD Workspace</h1><p id="buildVersionLine">Version 1.20.6 · 21/Sep/2026</p>
       <div id="themeToggle" style="display:flex;gap:4px;margin-top:8px;max-width:140px">
         <button onclick="setTheme('blue')" title="Blue (default)" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:linear-gradient(135deg,#0a162d,#1a2c52);cursor:pointer"></button>
         <button onclick="setTheme('black')" title="Black" style="flex:1;padding:4px 0;border-radius:6px;border:1px solid var(--line);background:#000;cursor:pointer"></button>
@@ -7579,7 +7579,7 @@ function renderWMatrix() {
       <input type="checkbox" ${t.done ? 'checked' : ''} onchange="wToggleTask(${t.id})"
         style="margin-top:3px;accent-color:${q.color};width:15px;height:15px;flex-shrink:0;cursor:pointer">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;${t.done ? 'text-decoration:line-through;opacity:.4' : ''}">
+        <div style="font-size:13px;font-weight:600">
           ${jmBadge}${wEsc(t.title)}
         </div>
         ${t.note ? `<div style="font-size:11px;color:rgba(110,145,210,.5);margin-top:2px">${wEsc(t.note)}</div>` : ''}
@@ -7604,7 +7604,7 @@ function renderWMatrix() {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       ${quadrants.map(q => {
-        const tasks = workState.tasks.filter(t => t.quadrant === q.key);
+        const tasks = workState.tasks.filter(t => t.quadrant === q.key && !t.done);
         const active = tasks.filter(t => !t.done);
         return `
         <div style="background:var(--surface);border:1px solid ${q.color}30;border-radius:16px;padding:20px">
